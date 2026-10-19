@@ -14,3 +14,5 @@
 下载对应平台的压缩包并解压。包内的 `include/at_vision/` 提供头文件，`lib/` 提供库文件，`examples/` 提供示例。Linux 包含 `lib/cmake/at_vision/at_vision-config.cmake`，可供 CMake 项目查找。具体接口与运行方式请以包内头文件和示例源码为准。
 
 本仓库只归档发布包；构建源码及完整产品文档未包含在当前目录中。
+
+2026年10月19日19:41:45  更新测试
