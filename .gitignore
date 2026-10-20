@@ -1,1 +1,7 @@
 .omx/
+
+# Visual Studio local state and build intermediates for the camera demo
+weldeye/**/.vs/
+weldeye/**/*.vcxproj.user
+weldeye/AoTaiCameraDemo/AoTaiCameraDemo/x64/
+weldeye/AoTaiCameraDemo/AoTaiCameraDemo/Dependentlibs/AoTai/Camera/log/

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ImportGroup Label="PropertySheets" />
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup>
+    <ExecutablePath>.\Dependentlibs\AoTai\SDK\X64;.\Dependentlibs\AoTai\Camera\DLL\Debug;$(ExecutablePath)</ExecutablePath>
+    <IncludePath>.\Dependentlibs\AoTai\Include;.\Dependentlibs\AoTai\Camera\Include;$(IncludePath)</IncludePath>
+    <LibraryPath>.\Dependentlibs\AoTai\SDK\X64;.\Dependentlibs\AoTai\Camera\DLL\Debug;$(LibraryPath)</LibraryPath>
+  </PropertyGroup>
+  <ItemDefinitionGroup>
+    <Link>
+      <AdditionalDependencies>MVCAMSDK_X64.lib;AoTaiCamera.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemGroup />
+</Project>
