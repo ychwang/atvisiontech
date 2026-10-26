@@ -1,0 +1,6 @@
+# 请求
+string[] alarm_codes
+---
+int16 status
+string message
+ATAlarmResetResult[] data

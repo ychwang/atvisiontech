@@ -1,0 +1,5 @@
+std_msgs/Empty request 
+---
+int16 status			# 响应状态码
+float64[] free_drive_damp	# 拖动阻尼,如[0.5,0.5,0.5,0.5,0.5,0.5]，数量6
+string message			# 状态信息

@@ -1,0 +1,5 @@
+string data
+---
+int64 result
+int16 status
+string message

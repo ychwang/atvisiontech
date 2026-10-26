@@ -1,0 +1,6 @@
+string template_id
+---
+int16 status
+int32 error_code
+string error_type
+string message

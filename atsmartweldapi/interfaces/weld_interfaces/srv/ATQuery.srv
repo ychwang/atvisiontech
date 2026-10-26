@@ -1,0 +1,13 @@
+# 查询条件 (多条件过滤)
+diagnostic_msgs/KeyValue[] filters			# 检索条件（包括id、行业、材料、板厚、分组、工件类型等）
+# 分页参数
+uint32 page_number                                      # 页码 (从1开始)
+uint32 items_per_page                                   # 每页数量（0则不分页）
+# 排序参数
+string sort_field                                       # 排序字段 (e.g. "id", "created_time")
+bool sort_descending                                    # true=降序, false=升序
+---
+# 响应结果
+int16 status						# 响应状态码
+string data						# 查询内容，json
+string message						# 状态信息

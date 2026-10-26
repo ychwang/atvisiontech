@@ -1,0 +1,5 @@
+string data
+---
+int16 status  #状态位
+string data
+string message  #错误或成功的相关信息

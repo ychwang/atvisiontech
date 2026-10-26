@@ -1,0 +1,6 @@
+# 请求部分
+string id            				# image id
+---
+# 响应部分
+int16 status                        # 操作状态
+string message                      # 状态消息

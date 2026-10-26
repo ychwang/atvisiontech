@@ -1,0 +1,83 @@
+{
+  "schema_version": 1,
+  "demonstration_only": true,
+  "coordinate_contract": {
+    "frame": "RobotBase",
+    "position_unit": "mm",
+    "orientation_convention": "XYZ Euler: w,p,r",
+    "angle_unit": "degree",
+    "confirmed": false
+  },
+  "project": {
+    "uid": "demo-project-001",
+    "name": "仅格式演示：多层多道",
+    "system_config_id": 0
+  },
+  "workpiece": {
+    "uid": "demo-workpiece-001",
+    "name": "仅格式演示工件",
+    "robot_tcp_id": 0,
+    "global_process": {
+      "coplanarity_check_mode": 1,
+      "enable_offset_correction": 0,
+      "target_accuracy_threshold": 0.5,
+      "smoothing_parameters": "",
+      "planning_parameters": "",
+      "enable_free_pose": 0,
+      "enable_input_safe_point": 0
+    }
+  },
+  "seams": [
+    {
+      "uid": "demo-seam-001",
+      "name": "演示直线焊缝",
+      "process_id": 0,
+      "base_path": [
+        {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0,
+          "w": 0.0,
+          "p": 0.0,
+          "r": 0.0
+        },
+        {
+          "x": 100.0,
+          "y": 0.0,
+          "z": 0.0,
+          "w": 0.0,
+          "p": 0.0,
+          "r": 0.0
+        }
+      ],
+      "passes": [
+        {
+          "index": 1,
+          "layer": 1,
+          "offset_horizontal_mm": 0.0,
+          "offset_vertical_mm": 0.0,
+          "offset_start_mm": 0.0,
+          "offset_end_mm": 0.0,
+          "direction_horizontal": 0,
+          "direction_vertical": 0,
+          "direction_forward": 0,
+          "direction_end": 0,
+          "weld_layer": -1
+        },
+        {
+          "index": 2,
+          "layer": 2,
+          "offset_horizontal_mm": 1.0,
+          "offset_vertical_mm": 1.0,
+          "offset_start_mm": 0.0,
+          "offset_end_mm": 0.0,
+          "direction_horizontal": 0,
+          "direction_vertical": 0,
+          "direction_forward": 0,
+          "direction_end": 0,
+          "weld_layer": -1
+        }
+      ]
+    }
+  ]
+}

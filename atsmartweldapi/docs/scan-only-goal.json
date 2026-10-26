@@ -1,0 +1,87 @@
+{
+  "project": {
+    "digital_input_start": 0,
+    "direct_run": 0,
+    "iot_packet_params": {
+      "packet_id": "",
+      "packet_name": ""
+    },
+    "loop_execution": 0,
+    "name": "APIDOC_SCAN_ONLY_NOT_SUBMITTED",
+    "need_digital_start": 0,
+    "need_reservation": 0,
+    "uid": "APIDOC_SCAN_ONLY_NOT_SUBMITTED",
+    "need_confirm_after_scanning": 0,
+    "need_confirm_after_planning": 0,
+    "id": 0
+  },
+  "workpieces": [
+    {
+      "coor_align_config": {
+        "align_mdoe": 0,
+        "is_enable_coor_align": false,
+        "is_enable_default_coor_align": false,
+        "target_wp_coor_name": "",
+        "wp_coor_name": ""
+      },
+      "custom_welding_options": {
+        "is_enable_wp_welding_options": false,
+        "is_enable_combin_node_welding": false,
+        "weld_options": []
+      },
+      "global_process": {
+        "coplanarity_check_mode": 0,
+        "enable_free_pose": 0,
+        "enable_input_safe_point": 0,
+        "enable_offset_correction": 0,
+        "planning_parameters": "",
+        "smoothing_parameters": "",
+        "target_accuracy_threshold": 3.0
+      },
+      "is_auto_adjust_attitude": false,
+      "is_crossing_welding": false,
+      "laser_task_type": 1,
+      "name": "3D scan-only reference",
+      "nodes": [],
+      "planning_mode": 0,
+      "robot_tcp_id": 1,
+      "scanning_fixed_point": [],
+      "scanning_mode": 1,
+      "scanning_welding": 1,
+      "tracker_type": 1,
+      "uid": "APIDOC_SCAN_ONLY_WORKPIECE",
+      "weld_process_id": 114,
+      "workpiece_coor": {
+        "coor_name": ""
+      },
+      "workpiece_db_id": -1,
+      "id": 0,
+      "scanning_feature_points": [
+        {
+          "x": 676.9761981510525,
+          "y": -84.91911734714634,
+          "z": 43.39195991040368,
+          "w": 0.015999066687914634,
+          "p": 0.4119973636840914,
+          "r": 0.024001748097261858,
+          "uid": "scan-start",
+          "valid": true,
+          "type": 0,
+          "weld": ""
+        },
+        {
+          "x": 686.9761981510525,
+          "y": -84.91911734714634,
+          "z": 43.39195991040368,
+          "w": 0.015999066687914634,
+          "p": 0.4119973636840914,
+          "r": 0.024001748097261858,
+          "uid": "scan-end",
+          "valid": true,
+          "type": 2,
+          "weld": ""
+        }
+      ]
+    }
+  ]
+}

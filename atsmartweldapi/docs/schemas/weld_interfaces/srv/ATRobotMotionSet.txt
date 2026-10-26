@@ -1,0 +1,16 @@
+bool is_default	        		# true:修改默认配置，不修改当前正在使用的配置，false:修改当前正在使用的配置，不修改默认配置
+float64 linear_velocity			# 直线运动速度设置-线速度
+float64 linear_acc			# 直线运动速度设置-线加速度
+float64 linear_angular_velocity		# 直线运动速度设置-角速度
+float64 linear_angular_acc		# 直线运动速度设置-角加速度
+float64 basic_position_velocity		# 基础模式速度设置-位置
+float64 basic_orientation_velocity	# 基础模式速度设置-姿态
+float64 basic_joint_velocity		# 基础模式速度设置-关节
+float64 step_position_velocity		# 步进模式速度设置-位置
+float64 step_orientation_velocity	# 步进模式速度设置-姿态
+float64 step_joint_velocity		# 步进模式速度设置-关节
+float64 speed_percentage		# 移动速度比例
+---
+int16 status				# 响应状态码
+int16 result				# 响应结果，预留
+string message				# 状态信息

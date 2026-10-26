@@ -1,0 +1,7 @@
+std_msgs/Empty request 
+---
+float64[] cur_pos
+float64[] joint_pos
+float64[] flan_pos
+int16 status
+string message

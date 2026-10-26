@@ -1,0 +1,6 @@
+string weld_ip
+bool on
+---
+int64 result
+int16 status
+string message

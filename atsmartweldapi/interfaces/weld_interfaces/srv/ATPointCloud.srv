@@ -1,0 +1,5 @@
+sensor_msgs/PointCloud2 cloud_input  # 请求字段
+float64 resolution
+---
+int16 status                          # 响应字段
+string message                        # 响应字段

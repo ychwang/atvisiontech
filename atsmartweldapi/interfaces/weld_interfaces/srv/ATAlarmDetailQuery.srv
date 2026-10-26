@@ -1,0 +1,7 @@
+# 请求
+string[] alarm_codes
+string language   		# 语言代码，如: zh, en, 默认zh
+---
+int16 status
+string message
+ATAlarmDetail[] data

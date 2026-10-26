@@ -1,0 +1,29 @@
+# Goal
+# 工艺包元数据JSON，对应package_meta
+string package_meta_json
+# 需要导出的工艺ID列表
+int32[] process_ids
+# 导出目标类型：USB / LOCAL / CACHE
+string target_type
+---
+# Result
+# 结果状态码，约定0成功，非0失败
+int16 status
+# 结果数据JSON，成功时返回导出结果
+string data
+# 结果说明信息
+string message
+---
+# Feedback
+# 当前总体进度百分比，范围0~100
+int32 progress
+# 当前阶段标识，例如PREPARE、EXPORT_PROCESS、WRITE_FILE
+string stage
+# 当前步骤显示文案
+string current_step
+# 当前步骤详细说明
+string detail
+# 当前已处理数量，例如已导出工艺数
+int32 processed_count
+# 当前总数量，例如总工艺数
+int32 total_count

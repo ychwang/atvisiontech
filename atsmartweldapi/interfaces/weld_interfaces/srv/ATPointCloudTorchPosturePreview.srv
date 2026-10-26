@@ -1,0 +1,22 @@
+# Complete WeldSceneInfo JSON using the strict preview contract.
+string weld_scene_info_json
+
+# Stable UID of the selected template seam.
+string template_seam_uid
+
+# Process library ID. The first pass posture is used.
+int32 weld_process_id
+
+# Read-only validated TCP association key. Calibration is not applied.
+int32 robot_tcp_id
+
+# false: original start -> end; true: original end -> start.
+bool reverse_direction
+---
+int16 status
+int32 error_code
+string error_type
+
+# Empty on failure; TorchPosturePreviewResult JSON on success.
+string posture_preview_json
+string message

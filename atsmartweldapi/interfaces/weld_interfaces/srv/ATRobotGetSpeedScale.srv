@@ -1,0 +1,5 @@
+# 查询机器人当前运动速度比例（与 /at/robot/adjspeed 的 value 语义一致，典型 0~1）
+---
+int16 status
+float64 speed_scale
+string message

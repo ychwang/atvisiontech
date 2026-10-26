@@ -1,0 +1,5 @@
+int16 collision_level	# 碰撞检测灵敏度等级，0: 关闭碰撞检测功能，1~9: 碰撞灵敏等级，碰撞灵敏度等级 数值越大越灵敏
+---
+int16 status		# 响应状态码
+int16 result		# 响应结果，成功返回0; 失败返回错误码
+string message		# 状态信息

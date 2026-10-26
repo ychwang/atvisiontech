@@ -1,0 +1,12 @@
+string response_type
+string sensor_state 
+string sensor_type
+int16 sensor_status
+string software_version_number
+string firmware_version_number        	
+string gateway 
+string sensor_id 
+string sensor_ip
+string subnet_mask
+int16 sensor_camera_height
+int16 sensor_camera_width

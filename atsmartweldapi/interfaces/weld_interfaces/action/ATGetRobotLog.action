@@ -1,0 +1,10 @@
+# Goal
+uint8 download_mode		# 0-默认日志，1-全量日志（包括core/crash）
+---
+# Result
+int16 status
+string data
+string message
+---
+# Feedback
+int32 progress

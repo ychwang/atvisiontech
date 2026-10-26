@@ -1,0 +1,23 @@
+{
+  "title": "工艺分组调用示例",
+  "blocks": [
+    {
+      "text": "ros2 service call /at/data/process_class_add weld_interfaces/srv/ATStringGeneric \"{data: '{\\\"name\\\": \\\"平角焊\\\"}'}\""
+    },
+    {
+      "text": "ros2 service call /at/data/process_class_update weld_interfaces/srv/ATStringGeneric \"{data: '{\\\"id\\\":3,\\\"name\\\": \\\"平焊\\\"}'}\""
+    },
+    {
+      "text": "ros2 service call /at/data/process_class_list weld_interfaces/srv/ATStringGeneric \"{}\""
+    },
+    {
+      "text": "ros2 service call /at/data/process_class_pseudo_delete weld_interfaces/srv/ATStringGeneric \"{'id': '7'}\""
+    },
+    {
+      "text": "ros2 service call /at/data/process_count_by_class weld_interfaces/srv/ATStringGeneric \"{}\""
+    },
+    {
+      "text": "ros2 service call /at/data/process_list_by_class weld_interfaces/srv/ATStringGeneric \"{id: '4'}\""
+    }
+  ]
+}

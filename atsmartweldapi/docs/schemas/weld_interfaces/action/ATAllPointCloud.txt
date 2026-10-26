@@ -1,0 +1,11 @@
+# Goal
+string json_data
+---
+# Result
+int16 status
+string message 
+---
+# Feedback
+ATPointCloud point_cloud
+uint32 sequence_id  # 当前块的序号（从0开始）
+uint32 total_blocks  # 总块数

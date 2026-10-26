@@ -1,0 +1,17 @@
+geometry_msgs/Point32 seam_point
+geometry_msgs/Point32 seam_point_ui
+geometry_msgs/Point32 seam_point1
+geometry_msgs/Point32 seam_point2
+geometry_msgs/Point32 seam_point3
+geometry_msgs/Point32 seam_point_bd
+sensor_msgs/PointCloud laser_3d
+int32[] laser
+sensor_msgs/Image raw_image
+float32 angle_3d
+float32 gap_3d
+float32 thickness_3d
+float32 weldarea
+int32 error
+int32 error_type
+ATLineParam[] lines
+bool show_all_lines

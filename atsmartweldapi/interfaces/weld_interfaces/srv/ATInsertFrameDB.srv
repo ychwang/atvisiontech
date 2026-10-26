@@ -1,0 +1,4 @@
+ATFrameInfo new_frame
+---
+bool success
+string message

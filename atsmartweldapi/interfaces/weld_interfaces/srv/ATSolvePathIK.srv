@@ -1,0 +1,13 @@
+# 笛卡尔路径点 (每行6个值: x, y, z, w, p, r)
+std_msgs/Float64MultiArray path_points
+# 路径点数量
+int32 path_point_count
+# 参考关节角度 (6个值)
+std_msgs/Float64MultiArray reference_joint
+---
+# 状态码：0 成功；非 0 为 tesseract_plan.hpp 的 StatusCode
+int32 status
+# 消息
+string message
+# 关节轨迹 (每行6个关节角度值)
+std_msgs/Float64MultiArray joint_trajectory

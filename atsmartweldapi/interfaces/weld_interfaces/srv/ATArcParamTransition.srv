@@ -1,0 +1,12 @@
+float64 start_current                   # 开始电流(A)
+float64 end_current                     # 结束电流(A)
+float64 start_voltage_arc_length        # 开始电压值(V)或弧长值
+float64 end_voltage_arc_length          # 结束电压值(V)或弧长值
+uint32 transition_time                  # 过渡时间(ms)
+int32 start_weld_mode                   # Welding mode applied before the parameter transition
+int32 end_weld_mode                     # Welding mode applied after the parameter transition
+
+---
+
+int16 status                            # 响应状态码，200成功，400失败，500异常
+string message                          # 状态信息

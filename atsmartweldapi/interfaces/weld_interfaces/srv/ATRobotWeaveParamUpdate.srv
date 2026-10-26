@@ -1,0 +1,35 @@
+# 动态修改当前自动作业焊缝的摆焊参数。
+# Service：/at/robot/update_weave_param。
+# 只作用于当前焊缝运行时副本，不写回工艺库。
+
+# 必须从 /at/task/current_weave_param 最新快照复制回来。
+string task_id
+string seam_id
+int32 pass_id
+int32 weave_seq
+
+# 完整摆焊参数；不支持只提交差量字段。
+bool is_weave
+string weave_type
+float64 weave_frequency
+float64 motion_speed
+float64 left_amplitude
+float64 right_amplitude
+int32 dwell_mode              # 0=停留距离，1=停留时间
+float64 left_stop_distance
+float64 right_stop_distance
+int32 left_stop_time_ms
+int32 right_stop_time_ms
+int32 direction
+float64 direction_angle
+float64 elevation_angle
+float64 up_height
+
+# 前端生成的请求标识，便于日志关联；后端不依赖其判重。
+string request_id
+---
+int16 status                  # 200成功，400失败，500异常
+int16 result                  # atrobot::ERROR_CODE 数值
+string message
+int32 sdk_ret                 # DUCO SDK 原始返回码；未调用 SDK 时为 0
+int32 accepted_weave_seq      # 成功时为新 weave_seq；失败时为当前/已知 weave_seq

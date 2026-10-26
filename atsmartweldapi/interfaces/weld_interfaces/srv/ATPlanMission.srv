@@ -1,0 +1,6 @@
+std_msgs/Float64MultiArray path_points
+int16 column_size
+---
+int16 status
+string message
+trajectory_msgs/JointTrajectory trajectory

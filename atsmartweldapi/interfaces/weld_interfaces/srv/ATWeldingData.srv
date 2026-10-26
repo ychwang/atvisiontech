@@ -1,0 +1,20 @@
+int32 page_num          		            # 每页数据点数
+int32 page_no           		            # 请求的页码(从0开始)
+int32 resolution      			            # 采样分辨率(ms)，0表示原始数据，预留字段，当前未实现
+---
+int16 status				                # 响应状态码
+string message				                # 状态信息
+int64 total       			                # 总条数
+int64[] timestamp	      		            # 时间戳数组(ms)
+int16[] synergic_mode			            # 电压调节模式数组(0：分别，1：一元化)
+int16[] weld_mode			                # 焊接模式数组(id)
+float64[] set_current			            # 设定电流数组(A)
+float64[] set_voltage_arc_length            # 设定电压(V)或弧长数组
+float64[] real_time_current		            # 实际电流数组(A)
+float64[] real_time_voltage      	        # 实际电压数组(V)
+int16 welding_process_type                  # 0:MIG/MAG ,1:LASER
+float64[] set_wire_feed_speed		        # 设定送丝速度数组(m/min)（激光焊）
+float64[] set_power			                # 设定功率数组(W)（激光焊）
+float64[] real_time_wire_feed_speed		    # 实际送丝速度数组(m/min)（激光焊）
+float64[] real_time_power		            # 实际功率数组(W)（激光焊）
+

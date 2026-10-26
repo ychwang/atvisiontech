@@ -1,0 +1,12 @@
+# 请求部分
+string id            				# image uid(不可重复，禁止修改)
+string file_name                    # 文件名，如aotai_logo.jpg
+string file_data                    # 文件二进制 Base64 编码
+string md5            				# md5
+string oem_type            			# 自定义oem字段，会自动覆盖重名记录，如‘aotai_logo’等
+---
+# 响应部分
+int16 status                        # 操作状态
+string id            				# image uid
+string md5            				# md5
+string message                      # 状态消息

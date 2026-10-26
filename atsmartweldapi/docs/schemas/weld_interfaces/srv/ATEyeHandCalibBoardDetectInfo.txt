@@ -1,0 +1,13 @@
+# 请求消息
+---
+# 响应消息
+int16 error_code
+sensor_msgs/CompressedImage left_image
+sensor_msgs/CompressedImage right_image
+geometry_msgs/Point32[] left_corner_points
+geometry_msgs/Point32[] right_corner_points
+geometry_msgs/Point32 left_center
+geometry_msgs/Point32 right_center
+float64[] extrinsic
+int16 status
+string message

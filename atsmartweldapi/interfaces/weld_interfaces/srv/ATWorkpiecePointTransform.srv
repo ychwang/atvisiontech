@@ -1,0 +1,8 @@
+ATFloat64Array[] refer_workpiece_feature_points
+ATFloat64Array[] trans_workpiece_feature_points
+ATFloat64Array correction_amount
+ATFloat64Array[] refer_workpiece_poses
+---
+int16 status 
+string message
+ATFloat64Array[] data

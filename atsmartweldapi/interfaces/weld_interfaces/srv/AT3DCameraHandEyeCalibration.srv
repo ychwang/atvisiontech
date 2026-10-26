@@ -1,0 +1,17 @@
+# 请求消息
+uint32 group_num			        # 标定组数
+uint32 point_num			        # 每组标定点数量
+float64[] bases 			        # bases: 每组1x3接触点坐标, size = group_num * 3
+float64[] cameras			        # cameras: 相机角点坐标, size = group_num * point_num * 3
+float64[] robots 			        # robots: 机器人坐标, size = group_num * point_num * 3
+float64[3] robot_posture		    # 机器人姿态欧拉角 (w, p, r),单位是角度（°）而非弧度（rad）
+
+---
+
+# 响应消息
+int16 status				        # 响应状态码，200成功，400失败，500异常
+string message				        # 状态信息
+float64[16] transform			    # 标定结果 4x4 变换矩阵
+float64 mean_err			        # cameras 转化到基准点坐标后的平均误差
+float64 min_err				        # cameras 转化到基准点坐标后的最小误差
+float64 max_err				        # cameras 转化到基准点坐标后的最大误差  

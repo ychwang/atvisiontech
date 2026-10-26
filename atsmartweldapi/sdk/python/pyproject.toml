@@ -1,0 +1,10 @@
+[build-system]
+requires=["setuptools>=61"]
+build-backend="setuptools.build_meta"
+[project]
+name="aotai-ros-sdk"
+version="1.0.12"
+requires-python=">=3.10"
+description="Lightweight native rclpy wrapper for existing AOTAI ROS interfaces"
+[tool.setuptools]
+packages=["aotai_sdk"]

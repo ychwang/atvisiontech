@@ -1,0 +1,9 @@
+float64[] tcp_pos
+float64[] transformed_tcp_pos
+float64[] tcp_v
+float64[] joint_pos
+float64[] joint_v
+int16     robot_mode
+int16     digital_input
+int16	  connect_status
+int64     timestamp

@@ -1,0 +1,7 @@
+string ip
+string serial_number
+string type
+---
+int16 status
+string data
+string message

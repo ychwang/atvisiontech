@@ -1,0 +1,7 @@
+int32 task_id
+string feedback_log
+string result_log
+---
+int16 status
+int16 result
+string message
