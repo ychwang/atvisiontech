@@ -1,0 +1,6 @@
+string type	        	# 姿态类型,home:原点，package：打包姿态，transport：运输姿态
+bool is_default	        	# true:默认配置，false:当前正在使用的配置
+---
+int16 status			# 响应状态码
+float64[] position		# 关节角度,如[30.0,30.0,30.0,30.0,30.0,30.0]，数量6
+string message			# 状态信息

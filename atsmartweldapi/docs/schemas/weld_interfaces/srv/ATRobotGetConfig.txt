@@ -1,0 +1,7 @@
+std_msgs/Empty request 
+---
+int16 status
+string robot_type    //机器人类型
+string robot_subtype //机器人子类型
+string robot_ip      //机器人IP地址
+string message

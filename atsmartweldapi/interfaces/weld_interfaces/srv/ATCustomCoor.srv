@@ -1,0 +1,15 @@
+bool is_custom_coor
+uint8 creation_method   
+string name
+string parent
+float64[] origin
+float64[] x_point
+float64[] y_point
+---
+int32 status
+string message
+
+# Coordinate frame creation methods
+uint8 CREATE_FROM_THREE_POINTS = 0
+uint8 CREATE_FROM_SINGLE_POINT = 1
+uint8 CREATE_FROM_USER_CHOICE  = 2

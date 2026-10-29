@@ -1,0 +1,12 @@
+# Request
+int32 welding_num
+weld_interfaces/MCSAttitude[] track_attitude
+weld_interfaces/MCSAutoPositionParams position_params
+int32 position_mode  #0 为工件中心 
+float64[] cur_point
+---
+# Response
+string result 
+bool   success
+string message
+

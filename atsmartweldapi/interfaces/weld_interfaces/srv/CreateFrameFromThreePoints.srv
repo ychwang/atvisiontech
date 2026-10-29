@@ -1,0 +1,9 @@
+string name
+string parent
+float64[3] origin
+float64[3] x_point
+float64[3] y_point
+bool is_system
+---
+bool success
+string message

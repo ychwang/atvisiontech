@@ -1,0 +1,6 @@
+---
+int16 status            # 200成功，202计算中，400计算失败
+int32 error_code        # 0成功；非0为稳定算法错误码
+string error_type       # 错误分类，前端不需要解析message
+string json_weld_data	#焊缝轨迹
+string message			# 状态信息

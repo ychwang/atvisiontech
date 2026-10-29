@@ -1,0 +1,3 @@
+string control_str
+---
+string message

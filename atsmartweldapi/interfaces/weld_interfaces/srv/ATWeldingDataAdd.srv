@@ -1,0 +1,16 @@
+int64 timestamp
+int32 synergic_mode
+int32 weld_mode
+float64 set_current
+float64 set_voltage_arc_length
+float64 real_time_current
+float64 real_time_voltage
+int32 welding_process_type
+float64 set_wire_feed_speed
+float64 set_power
+float64 real_time_wire_feed_speed
+float64 real_time_power
+---
+int16 status
+int16 result
+string message

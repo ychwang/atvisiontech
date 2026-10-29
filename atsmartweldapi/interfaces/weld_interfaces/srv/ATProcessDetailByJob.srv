@@ -1,0 +1,6 @@
+int32 class_job_num
+int32 job_num
+---
+int16 status
+string data
+string message

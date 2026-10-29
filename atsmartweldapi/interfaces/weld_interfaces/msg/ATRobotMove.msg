@@ -1,0 +1,10 @@
+# 中间点  
+float64[] mid_point  
+# 结束点  
+float64[] end_point  
+# 运动速度  
+float64 velocity  
+# 交融半径  
+float64 blend_radius  
+# 加速度  
+float64 acceleration  

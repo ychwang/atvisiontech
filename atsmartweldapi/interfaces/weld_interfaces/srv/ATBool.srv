@@ -1,0 +1,7 @@
+bool enable
+---
+int16 status
+string data
+string message
+int16 result
+

@@ -1,0 +1,4 @@
+---
+sensor_msgs/PointCloud2[] clouds
+int16 status
+string message

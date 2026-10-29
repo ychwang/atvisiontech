@@ -1,0 +1,13 @@
+# 请求消息
+geometry_msgs/Point[] points  # 使用ROS内置的Point类型
+string model  # 模型类型，例如 "rectangle" 或 "cylinder"或point_cloud或"stl"
+string model_path  # 模型文件路径
+string name  # 障碍物名称
+float64 length # 长度
+float64 width # 宽度
+float64 height  # 高度
+bool enable # 是否启用
+---
+# 响应消息
+int16 status
+string message

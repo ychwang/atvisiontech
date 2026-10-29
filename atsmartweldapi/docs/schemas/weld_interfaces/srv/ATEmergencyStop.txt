@@ -1,0 +1,8 @@
+# 请求
+uint8 command  # 0: 急停, 1: 复位, 2: 查询状态
+
+---
+# 响应
+int16 status
+uint8 emergency_stop_state  # 急停状态 0: 急停, 1: 复位
+string message

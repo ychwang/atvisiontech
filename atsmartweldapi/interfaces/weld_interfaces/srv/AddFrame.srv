@@ -1,0 +1,7 @@
+string name
+string parent
+float64[16] transform
+bool is_system
+---
+bool success
+string message

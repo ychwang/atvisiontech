@@ -1,0 +1,18 @@
+string ref_frame_name
+string ref_frame_parent
+string align_frame_name
+string align_frame_parent
+# 0:覆盖，1：偏移
+int32 align_mode
+#对齐焊缝还是寻位轨迹 
+#0:焊缝 1:先扫后焊轨迹 2:寻位轨迹 
+int32 align_type
+ATNodeInfo[] nodes
+ATAlignPoint[] scanning_feature_points
+ATAlignPoint[] positioning_feature_point
+---
+bool success
+string message
+ATNodeInfo[] nodes_new
+ATAlignPoint[] scanning_feature_points_new
+ATAlignPoint[] positioning_feature_point_new

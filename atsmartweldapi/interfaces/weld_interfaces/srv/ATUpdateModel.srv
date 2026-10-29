@@ -1,0 +1,6 @@
+int64 model  # 0: welding gun model, 1: camera model
+string name  # Local model file path
+---
+int64 result
+int16 status
+string message

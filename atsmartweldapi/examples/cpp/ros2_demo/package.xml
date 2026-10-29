@@ -1,0 +1,12 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>aotai_ros2_query_demo</name>
+  <version>1.0.12</version>
+  <description>Minimal read-only ROS 2 and AOTAI SDK query demos.</description>
+  <maintainer email="noreply@example.invalid">AOTAI</maintainer>
+  <license>MIT</license>
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  <depend>rclcpp</depend>
+  <depend>weld_interfaces</depend>
+  <!-- aotai_sdk_cpp is intentionally an optional CMake dependency. -->
+</package>

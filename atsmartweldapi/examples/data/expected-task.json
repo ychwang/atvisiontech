@@ -1,0 +1,104 @@
+{
+  "project": {
+    "id": 0,
+    "name": "仅格式演示：多层多道",
+    "uid": "demo-project-001",
+    "loop_execution": 0,
+    "need_digital_start": 0,
+    "direct_run": 0,
+    "need_reservation": 0,
+    "system_config_id": 0,
+    "execution_mode": 1,
+    "task_source": 0
+  },
+  "workpieces": [
+    {
+      "id": 0,
+      "workpiece_id": 0,
+      "uid": "demo-workpiece-001",
+      "name": "仅格式演示工件",
+      "laser_task_type": 0,
+      "scanning_welding": 0,
+      "scanning_mode": 0,
+      "nodes": [
+        {
+          "uid": "demo-seam-001",
+          "name": "演示直线焊缝",
+          "node_type": 0,
+          "path": [
+            {
+              "x": 0.0,
+              "y": 0.0,
+              "z": 0.0,
+              "w": 0.0,
+              "p": 0.0,
+              "r": 0.0,
+              "uid": "demo-seam-001-point-1",
+              "valid": true
+            },
+            {
+              "x": 100.0,
+              "y": 0.0,
+              "z": 0.0,
+              "w": 0.0,
+              "p": 0.0,
+              "r": 0.0,
+              "uid": "demo-seam-001-point-2",
+              "valid": true
+            }
+          ],
+          "weld_process_id": 0,
+          "is_multi": true,
+          "multi_layer_num": 2,
+          "multi_pass_num": 2,
+          "multi_pass_params": [
+            {
+              "multi_index": 1,
+              "multi_offset_horizontal": 0.0,
+              "multi_offset_vertical": 0.0,
+              "multi_offset_start": 0.0,
+              "multi_offset_end": 0.0,
+              "multi_dir_horizontal": 0,
+              "multi_dir_vertical": 0,
+              "multi_dir_forward": 0,
+              "multi_offset_dir_end": 0,
+              "multi_offset_mode": 0,
+              "multi_offset_x": 0.0,
+              "layer_index": 1,
+              "weld_layer": -1
+            },
+            {
+              "multi_index": 2,
+              "multi_offset_horizontal": 1.0,
+              "multi_offset_vertical": 1.0,
+              "multi_offset_start": 0.0,
+              "multi_offset_end": 0.0,
+              "multi_dir_horizontal": 0,
+              "multi_dir_vertical": 0,
+              "multi_dir_forward": 0,
+              "multi_offset_dir_end": 0,
+              "multi_offset_mode": 0,
+              "multi_offset_x": 0.0,
+              "layer_index": 2,
+              "weld_layer": -1
+            }
+          ]
+        }
+      ],
+      "weld_process_id": 0,
+      "global_process": {
+        "coplanarity_check_mode": 1,
+        "enable_offset_correction": 0,
+        "target_accuracy_threshold": 0.5,
+        "smoothing_parameters": "",
+        "planning_parameters": "",
+        "enable_free_pose": 0,
+        "enable_input_safe_point": 0
+      },
+      "workpiece_type": 0,
+      "robot_tcp_id": 0,
+      "workpiece_db_id": 0,
+      "tracker_type": 2
+    }
+  ]
+}

@@ -1,0 +1,7 @@
+# 0: Rename, 1: UpdateTransform, 2: UpdateParent, 3:
+int32 type
+string origin_name
+ATFrameInfo frame
+---
+bool success
+string message

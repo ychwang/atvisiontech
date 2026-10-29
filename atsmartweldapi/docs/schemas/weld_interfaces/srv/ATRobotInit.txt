@@ -1,0 +1,9 @@
+string robot_type  
+string robot_subtype 
+string robot_ip
+string local_ip
+float64 robot_scope
+---
+int16 status
+string data
+string message

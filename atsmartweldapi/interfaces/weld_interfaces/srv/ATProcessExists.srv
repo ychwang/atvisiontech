@@ -1,0 +1,5 @@
+int32 process_id
+---
+int16 status
+bool exists
+string message

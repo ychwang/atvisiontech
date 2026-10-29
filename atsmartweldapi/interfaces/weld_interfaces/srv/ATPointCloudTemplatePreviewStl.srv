@@ -1,0 +1,11 @@
+# Template whose lightweight preview model should be returned.
+string template_id
+---
+# 200 on success; 400 for an invalid, missing, old, or damaged template.
+int16 status
+int32 error_code
+string error_type
+string message
+# Complete binary STL encoded as a standard Base64 string.
+# Valid only when status is 200. The value does not include a data-URI prefix.
+string data

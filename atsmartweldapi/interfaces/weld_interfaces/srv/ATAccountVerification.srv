@@ -1,0 +1,6 @@
+string user
+string password
+---
+int16 status				# 响应状态码，200成功，400失败，500异常
+int32 error_code			# 0-SUCCESS,1-USER_NOT_FOUND,2-PASSWORD_MISMATCH,3-SYSTEM_ERROR
+string message				# 状态信息

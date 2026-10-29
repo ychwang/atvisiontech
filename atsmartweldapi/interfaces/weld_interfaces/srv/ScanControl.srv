@@ -1,0 +1,4 @@
+string json_scan_cmd			# 扫描指令
+---
+int16 status				# 响应状态码，200成功，400失败，500异常
+string message			# 状态信息

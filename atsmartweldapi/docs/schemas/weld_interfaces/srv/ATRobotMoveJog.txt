@@ -1,0 +1,7 @@
+string move_type
+float64 direction
+float64 speed
+---
+int16 status
+string data
+string message

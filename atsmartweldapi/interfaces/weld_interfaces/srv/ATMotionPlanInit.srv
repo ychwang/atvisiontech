@@ -1,0 +1,9 @@
+string robot_arm_name
+string pipeline_id
+string planner_id
+float64 planning_time
+float64[] tcp_offset
+float64[] laser_calibration
+---
+int16 status
+string message

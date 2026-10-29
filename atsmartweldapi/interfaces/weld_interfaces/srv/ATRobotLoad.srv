@@ -1,0 +1,7 @@
+float64 m
+float64[] com
+float64[] inertial
+---
+int16 status
+string data
+string message

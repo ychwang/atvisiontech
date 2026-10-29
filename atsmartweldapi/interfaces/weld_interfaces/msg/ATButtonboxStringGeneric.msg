@@ -1,0 +1,1 @@
+string data      #焊枪支架定时发送工件树信息给APP

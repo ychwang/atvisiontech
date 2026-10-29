@@ -1,0 +1,5 @@
+string name
+---
+int16 status
+string data
+string message

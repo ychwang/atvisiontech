@@ -1,0 +1,10 @@
+# Goal
+string package_name
+---
+# Result
+int16 status
+string data
+string message
+---
+# Feedback
+int32 progress

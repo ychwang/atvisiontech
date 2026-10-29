@@ -1,0 +1,9 @@
+string board
+int64 port
+bool in_or_out
+bool get_or_set
+bool state
+---
+int16 status
+string data
+string message

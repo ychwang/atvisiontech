@@ -1,0 +1,5 @@
+std_msgs/Empty request 
+---
+int16 status			# 响应状态码
+int16 collision_stop_type	# 碰撞停止类型, 0: 碰撞后浮动，即碰撞之后进入拖动示教模式,1: 碰撞后静止,2: 碰撞后抱闸
+string message			# 状态信息

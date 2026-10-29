@@ -1,0 +1,5 @@
+std_msgs/Empty request 
+---
+int16 status		# 响应状态码
+int16 collision_level	# 碰撞检测灵敏度等级，0: 关闭碰撞检测功能，1~9: 碰撞灵敏等级，碰撞灵敏度等级 数值越大越灵敏
+string message		# 状态信息

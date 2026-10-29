@@ -1,0 +1,7 @@
+string task_status
+string workpiece_status
+string task_detail
+---
+int16 status
+int16 result
+string message

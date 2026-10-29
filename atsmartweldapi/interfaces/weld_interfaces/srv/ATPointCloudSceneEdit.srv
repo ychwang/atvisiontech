@@ -1,0 +1,26 @@
+# redefine_workpiece_frame / reverse_workpiece_x / reverse_workpiece_z
+# reverse_seam_x / reverse_seam_z / rotate_seam_x
+string operation
+
+# Required for reverse_seam_x, reverse_seam_z and rotate_seam_x.
+string target_seam_uid
+
+# Current complete WeldSceneInfo JSON from the frontend.
+string weld_scene_info_json
+
+# Operation-specific JSON.
+# redefine_workpiece_frame:
+# {"new_workpiece_frame":{"pose":[16]}}
+# rotate_seam_x:
+# {"angle_degrees":15.0}; a JSON number such as 15.0 is also accepted.
+# Workpiece/seam reverse operations may use an empty string or {}.
+string operation_data_json
+---
+int16 status
+
+# Complete WeldSceneInfo JSON after authoritative backend calculation.
+string weld_scene_info_json
+
+# Optional extension data, currently returns operation and target_seam_uid.
+string data
+string message

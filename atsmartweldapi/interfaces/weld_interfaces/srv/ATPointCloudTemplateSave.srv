@@ -1,0 +1,18 @@
+# create / update
+string operation
+# For create: empty uses the current cached extraction; non-empty creates a
+# new independent template from this existing source template (Save As).
+# For update: identifies the template to update.
+string template_id
+string template_name
+# Algorithm WeldSceneInfo JSON. The root object contains workpiece_frame,
+# template_seams and the complete seams array.
+string weld_scene_info_json
+---
+int16 status
+int32 error_code
+string error_type
+string template_id
+string message
+# Complete JSON response returned by the algorithm library.
+string data
