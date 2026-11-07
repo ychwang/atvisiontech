@@ -1,6 +1,6 @@
 # AOTAI ROS 2 Python SDK
 
-这是对现有 ROS 2 Service/Action/Topic 的轻量客户端封装，不是 HTTP/REST，也不会启动服务端或设备。导入模块和默认示例均离线；任何运动、任务或相机采集都必须由调用者显式执行。
+这是对现有 ROS 2 Service/Action/Topic 的轻量客户端封装，不是 HTTP/REST，也不会启动服务端。导入模块不会创建 ROS 客户端；具体示例按用途开启通信，`camera_config.py` 直接执行配置查询。运动、任务或相机采集必须由调用者显式执行。
 
 ## 安装
 
@@ -17,7 +17,23 @@ export PYTHONPATH="$PWD/sdk/python:$PYTHONPATH"
 
 无第三方 Python 网络库依赖；`rclpy` 来自 ROS 2，`weld_interfaces` Python 类型由随包接口定义构建生成。
 
+## 跨主机运行实例
+
+完整步骤见[构建与运行：跨主机 Python 实例](../../docs/build-run.md)。随包的 [fastdds_client.xml](../../examples/config/fastdds_client.xml) 将本机网卡地址和系统主机发现地址分开配置。修改文件里的两处 IP，加载 ROS、接口包与 DDS 环境后，在 API 根目录运行：
+
+```bash
+python3 examples/python/camera/camera_config.py
+```
+
+该脚本在当前电脑调用 `/at/camera_node/config`，固定查询 `get_camera_config`；要求相机已连接。它会自动加载包内 XML（系统主机 `192.168.1.101`、本机 `192.168.1.252`），并设置 domain 0 和 Fast DDS。无需 SSH，也无需包外测试目录。每个新终端仍需加载 ROS、接口包和 SDK 路径；换环境时修改 XML 的 IP 及脚本中的 domain。
+
+脚本中的 `os.environ.update(...)` 和两条 `os.environ.pop(...)` 要在第一次创建 `Client()` 或初始化 `rclpy` 之前执行。同一 Python 进程中的后续接口共用这套通信环境，无需逐次设置；它不会自动连接或使能设备。修改环境不能让已经创建的客户端立即切换目标，应重新启动客户端。
+
+这些设置不会传回启动 Python 的终端。单独运行另一个 `.py` 时，仍需在其开头设置，或在父终端统一加载环境。`camera_config.py` 的配置位于主入口中，仅导入该模块不会自动设置。XML 路径按 `examples/python/camera/` 的位置计算，移动脚本时需调整路径。逐项说明和连续查询示例见上述“构建与运行”文档。
+
 ## 通用原生接口
+
+相机用例集中在 [examples/python/camera](../../examples/python/camera/README.md)：68 个配置命令每条一个脚本，另保留搜索、采集和点云示例。可直接执行 `python3 examples/python/camera/get_camera_config.py`；完整扫描的运行方式和成功结果见目录中的 `camera_scan_demo.md`。
 
 ```python
 from aotai_sdk import Client

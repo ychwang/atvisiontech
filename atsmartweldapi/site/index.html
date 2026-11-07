@@ -24,6 +24,7 @@
 <h3>方案一：原生 ROS 2</h3>
 <p>客户端从 API 根目录执行 <code>colcon build --base-paths interfaces/weld_interfaces</code>，加载 <code>install/setup.bash</code> 后通过完整服务名调用，例如 <code>/at/robot/status</code>。ROS_DOMAIN_ID 使用部署方提供的值；跨主机时 ROS_LOCALHOST_ONLY 为 0，并允许 DDS 发现和数据通信。这里不使用 WebSocket URL，也不向服务名附加工控机 IP。</p>
 <p>需要先等待服务或 Action server 可发现；Topic 订阅的 QoS 与发布方匹配。自己的程序直接使用 rclpy/rclcpp；创建步骤见<a href="#build-run">构建与运行</a>，完整查询见<a href="#minimal-demo">最小 Demo</a>。</p>
+<p>多网卡或需要指定系统主机发现地址时，参照<a href="#build-run">构建与运行</a>中的“跨主机实例”：使用随包 Fast DDS XML 配置本机通信 IP 和初始发现目标，再从本机运行 Python 查询。示例中用户电脑为 <code>192.168.1.252</code>、系统主机为 <code>192.168.1.101</code>、相机为 <code>192.168.1.20</code>，三者不能混用。</p>
 <h3>方案二：rosbridge / WebSocket</h3>
 <p>客户端使用部署方提供的地址，例如 <code>ws://设备地址:端口/路径</code>。常见端口为 9090，实际端口、路径、TLS 和访问方式由部署配置确定。<code>127.0.0.1</code> 只表示客户端所在计算机，远程接入需填写实际桥接地址；HTTPS 页面使用可受信任的 wss:// 地址。</p>
 <p>桥接端需已加载与系统匹配的 weld_interfaces，并能访问目标 ROS 2 服务；已有部署不需要调用方重新构建或部署。WebSocket 客户端不需要安装 ROS 2、接口包或 SDK。建立 WebSocket 连接后再发送消息；连接成功不保证某个 Service 已存在。Action、压缩与分片等功能依赖桥接器的实际能力，集成时应确认其支持情况。</p>
@@ -3755,7 +3756,7 @@ int16 result
 </code></pre></div></details>
 <div class="endpoint-summary"><p>开启或关闭相机搜索；不连接相机。</p></div>
 <p class="muted public-data-link">公共数据 / 状态：<a href="#type-cloud">见数据类型与状态码</a></p>
-<h4>调用条件</h4><p>当前驱动支持设备搜索。</p>
+<h4>调用条件</h4><p>系统主机已部署相机节点，当前驱动支持设备搜索；客户端可访问 ROS 服务及发现结果 Topic。</p>
 <h4>请求参数</h4><div class="table-scroll fields-scroll"><table class="field-table"><thead><tr><th>字段</th><th>类型</th><th>含义与填写方式</th><th>有效值／限制</th></tr></thead><tbody>
 <tr><td><code class="field-path">enable</code></td><td>bool</td><td>true 启用设备搜索及结果回调；false 停用。</td><td><strong>赋值：</strong>true 开始发现，false停止。；<strong>范围 / 枚举：</strong>bool。</td></tr>
 </tbody></table></div>
@@ -3769,8 +3770,14 @@ int16 result
 <p class="module-link">完整流程：<a href="#examples-camera">对应模块示例</a></p><h4>请求数据</h4><div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-json">{
   &quot;enable&quot;: true
 }</code></pre></div>
-<h4>返回数据与成功判断</h4><p>设备列表通过 camera_discovery Topic 异步到达，服务200不代表找到设备。 目标服务必须已部署并可发现。</p>
-<h4>状态码 / 枚举</h4><div class="table-scroll"><table><thead><tr><th>数值 / 字段</th><th>业务含义</th><th>处理</th></tr></thead><tbody><tr><td><code>200</code></td><td>服务端已完成当前请求处理；对控制接口仍须结合 result/后续状态判断设备状态。</td><td>先检查 status，再按本接口的 result/data/message 解释。</td></tr><tr><td><code>400</code></td><td>服务拒绝、前置状态不满足或请求值不可接受。</td><td>读取 message；不要自动重试有副作用的控制。</td></tr><tr><td><code>500</code></td><td>异常或本接口定义的运行时不可用。</td><td>保留 message；状态未知时查询状态/等待人工处置。</td></tr></tbody></table></div>
+<h4>响应示例</h4><div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-json">{
+  &quot;status&quot;: 200,
+  &quot;data&quot;: &quot;&quot;,
+  &quot;message&quot;: &quot;Search enabled&quot;,
+  &quot;result&quot;: 0
+}</code></pre></div>
+<h4>返回数据与成功判断</h4><p class="bullet">• 上方响应示例为 2026-11-02 实测开启搜索的服务响应。<code>status=200</code>、<code>message=&quot;Search enabled&quot;</code> 表示搜索已开启，不表示已经找到设备；<code>result=0</code> 不是设备数量，<code>data</code> 也不承载设备列表。</p><p class="bullet">• 设备列表由 Topic <code>/at/camera_node/sensor_search_result</code> 异步发布，消息类型为 <code>std_msgs/msg/String</code>。详见<a href="#camera_discovery">读取相机发现结果与连接GUID</a>中的真实消息和解析示例。</p><p class="bullet">• <code>camera_discovery</code> 只是本文档的条目标识，不是 ROS Topic 名称。订阅时使用完整路径 <code>/at/camera_node/sensor_search_result</code>。</p><p class="bullet">• 本次收到 1 台相机的设备列表后，以 <code>enable=false</code> 关闭搜索，返回 <code>status=200</code>、<code>message=&quot;Search disabled&quot;</code>。发现有效设备不等于设备已连接或能够采集。</p>
+<h4>状态码 / 枚举</h4><div class="table-scroll"><table><thead><tr><th>数值 / 字段</th><th>业务含义</th><th>处理</th></tr></thead><tbody><tr><td><code>200</code></td><td>搜索开关设置成功；开启时 Search enabled，关闭时 Search disabled。</td><td>从发现结果 Topic 接收设备数组；不要把 result 当作设备数量。</td></tr><tr><td><code>500</code></td><td>源码定义的搜索不可用分支，例如节点正在关闭、驱动不存在或不支持搜索；本次未实测该错误。</td><td>检查 message 和相机节点状态；不要将服务错误解释为设备列表为空。</td></tr></tbody></table></div>
 </article><article class="endpoint searchable" id="camera_config" data-category="camera">
 <div class="endpoint-heading"><span class="method">SERVICE</span><h3>配置3D相机</h3></div>
 <p class="endpoint-name">/at/camera_node/config</p><p class="muted">weld_interfaces/srv/LaserConfig</p>
@@ -3786,54 +3793,778 @@ string message</code></pre></div></details>
 <h4>响应字段</h4><div class="table-scroll fields-scroll"><table class="field-table"><thead><tr><th>字段</th><th>类型</th><th>含义与解析方式</th></tr></thead><tbody>
 <tr><td><code class="field-path">message</code></td><td>string</td><td>外层LaserConfig只有message，需解析其中JSON。内层status：200成功，400未知command_type，403缺失或非法参数，500设备未连接或SDK失败，501 ROI格式/配置失败。error_type为驱动错误码，不是HTTP或ROS状态码。</td></tr>
 </tbody></table></div><p class="muted">嵌套类型可跳转到<a href="#data-types">数据类型与状态码</a>中的对应定义。</p>
-<h4>JSON 请求字段</h4><div class="table-scroll fields-scroll"><table class="field-table json-field-table"><thead><tr><th>字段路径</th><th>类型</th><th>含义与填写／解析方式</th><th>有效值／限制</th></tr></thead><tbody><tr><td><code class="field-path">request.<wbr>config_<wbr>str.<wbr>command_<wbr>type</code></td><td>string</td><td>VZ配置命令，可选值：connect、disconnect、connect_status、camera_configuration、laser_configuration、get_param_range、get_camera_config、get_resolution、get_laser_config、laser_status。大小写必须匹配。</td><td><strong>赋值：</strong>必填；大小写敏感。当前VZ分支接受：<code>connect</code>、<code>disconnect</code>、<code>connect_status</code>、<code>camera_configuration</code>、<code>laser_configuration</code>、<code>get_param_range</code>、<code>get_camera_config</code>、<code>get_resolution</code>、<code>get_laser_config</code>、<code>laser_status</code>、<code>set_eye_hand_calib_cfg</code>、<code>get_eye_hand_calib_cfg</code>、<code>get_calib_board_extrinsic</code>、<code>get_detected_calib_board_info</code>、<code>get_eye_hand_calib_matrix</code>、<code>enable_swing_motor</code>、<code>disable_swing_motor</code>、<code>reboot_swing</code>、<code>is_enable_swing_motor</code>、<code>set_swing_angle_speed</code>、<code>get_swing_angle_speed</code>、<code>set_swing_motor_angle</code>、<code>get_swing_motor_angle</code>、<code>rotate_swing</code>、<code>rotate_swing_to_start</code>、<code>set_swing_cur_start_pos</code>、<code>set_swing_cur_end_pos</code>、<code>set_swing_scan_mode</code>、<code>get_swing_scan_mode</code>、<code>get_swing_motor_info</code>、<code>get_swing_cur_angle</code>、<code>set_swing_stop_time</code>、<code>set_swing_rotate_direct</code>、<code>get_swing_rotate_direct</code>、<code>set_swing_stop_angle</code>、<code>get_swing_stop_angle</code>、<code>set_swing_end_angle_thres</code>、<code>get_swing_end_angle_thres</code>、<code>set_swing_motor_work_range</code>、<code>enable_global_denoise</code>、<code>disable_global_denoise</code>、<code>is_enable_global_denoise</code>、<code>is_support_rgb</code>、<code>enable_rgb</code>、<code>is_enable_rgb</code>、<code>enable_rgb_awb</code>、<code>is_enable_rgb_awb</code>、<code>enable_rgb_auto_expose</code>、<code>is_enable_rgb_auto_expose</code>、<code>enable_strobe</code>、<code>is_enable_strobe</code>、<code>turn_on_strobe_laser</code>、<code>is_turn_on_strobe_laser</code>、<code>enable_auto_cover_control</code>、<code>is_enable_auto_cover_control</code>、<code>enable_io_control</code>、<code>is_enable_io_control</code>、<code>set_rgb_expose</code>、<code>get_rgb_expose</code>、<code>set_rgb_gain</code>、<code>get_rgb_gain</code>、<code>set_rgb_trigger_mode</code>、<code>get_rgb_trigger_mode</code>、<code>set_rgb_auto_expose_thres</code>、<code>get_rgb_auto_expose_thres</code>、<code>set_anti_reflect_gain_type</code>、<code>get_anti_reflect_gain_type</code>、<code>format_detect_roi</code>。；<strong>范围 / 枚举：</strong>大小写精确；空/未知命令的最终结果依driver分支。</td></tr><tr><td><code class="field-path">request.<wbr>config_<wbr>str.<wbr>guid</code></td><td>string</td><td>仅connect使用：来自实际sensor_search_result的GUID，不是IP。</td><td><strong>赋值：</strong>command_type=connect时必填；<strong>范围 / 枚举：</strong>空/不存在时500。</td></tr><tr><td><code class="field-path">request.<wbr>config_<wbr>str.<wbr>frame_<wbr>id</code></td><td>string</td><td>可选；存在时保存进VZ driver的frame_id_。</td><td><strong>赋值：</strong>可选；<strong>范围 / 枚举：</strong>ATPointCloud不含frame_id字段，不可假定传播。</td></tr><tr><td><code class="field-path">request.<wbr>config_<wbr>str.<wbr>camera_<wbr>config</code></td><td>object</td><td>仅 command_type=<code>camera_configuration</code> 的写入对象。</td><td><strong>赋值：</strong>该命令必填；缺失=403/error_type=1002。；<strong>范围 / 枚举：</strong>见子字段。</td></tr><tr><td><code class="field-path">request.<wbr>config_<wbr>str.<wbr>camera_<wbr>config.<wbr>exposure</code></td><td>integer</td><td>固定曝光请求值。</td><td><strong>赋值：</strong>可选；20..100000按输入值设置，超出范围时改为200，不返回范围错误。；<strong>范围 / 枚举：</strong>建议20..100000；单位当前接口未声明。</td></tr><tr><td><code class="field-path">request.<wbr>config_<wbr>str.<wbr>camera_<wbr>config.<wbr>frame_<wbr>rate</code></td><td>integer</td><td>帧率请求。</td><td><strong>赋值：</strong>可选；&lt;=0先取设备min（min为0则1）；其余夹到SDK查询的min/max。；<strong>范围 / 枚举：</strong>实际范围由 get_param_range 的 ranges.frame_rate 返回。</td></tr><tr><td><code class="field-path">request.<wbr>config_<wbr>str.<wbr>camera_<wbr>config.<wbr>left_<wbr>gain</code></td><td>integer</td><td>左相机增益。</td><td><strong>赋值：</strong>可选；超范围立即403。；<strong>范围 / 枚举：</strong>0..255。</td></tr><tr><td><code class="field-path">request.<wbr>config_<wbr>str.<wbr>camera_<wbr>config.<wbr>right_<wbr>gain</code></td><td>integer</td><td>右相机增益。</td><td><strong>赋值：</strong>可选；超范围立即403。；<strong>范围 / 枚举：</strong>0..255。</td></tr><tr><td><code class="field-path">request.<wbr>config_<wbr>str.<wbr>camera_<wbr>config.<wbr>left_<wbr>roi.<wbr>left</code></td><td>integer</td><td>左ROI四边。</td><td><strong>赋值：</strong>left_roi 与 right_roi 必须同时出现，且每个对象必须四键齐全；否则403。；<strong>范围 / 枚举：</strong>目标相机决定最终可用范围；本层无数值界限。</td></tr><tr><td><code class="field-path">request.<wbr>config_<wbr>str.<wbr>camera_<wbr>config.<wbr>right_<wbr>roi.<wbr>left</code></td><td>integer</td><td>右ROI四边。</td><td><strong>赋值：</strong>同左ROI；单独给一侧不会进入ROI写入分支。；<strong>范围 / 枚举：</strong>目标相机决定最终可用范围；失败501。</td></tr><tr><td><code class="field-path">request.<wbr>config_<wbr>str.<wbr>laser_<wbr>config</code></td><td>object</td><td>仅 command_type=<code>laser_configuration</code> 的写入对象。</td><td><strong>赋值：</strong>该命令必填；缺失=403/error_type=1002。；<strong>范围 / 枚举：</strong>可只含一个可写成员。</td></tr><tr><td><code class="field-path">request.<wbr>config_<wbr>str.<wbr>laser_<wbr>config.<wbr>laser_<wbr>off</code></td><td>boolean</td><td>true关闭激光；false打开。</td><td><strong>赋值：</strong>可选；使用JSON布尔值。；<strong>范围 / 枚举：</strong>SDK错误将 status 设为SDK返回值、error_type=2001（不保证500）。</td></tr><tr><td><code class="field-path">request.<wbr>config_<wbr>str.<wbr>laser_<wbr>config.<wbr>laser_<wbr>power_<wbr>level</code></td><td>integer</td><td>SDK激光功率等级。</td><td><strong>赋值：</strong>可选；直接传SDK。；<strong>范围 / 枚举：</strong>本层没有数值范围；先用返回 laser_power_range 现场确认。SDK错误状态是SDK返回值。</td></tr><tr><td><code class="field-path">request.<wbr>config_<wbr>str.<wbr>enable</code></td><td>bool | number</td><td>仅命令 enable_rgb,enable_rgb_awb,enable_rgb_auto_expose,enable_strobe,enable_auto_cover_control,enable_io_control 使用，其他命令不读此字段。；首选 enable，缺失时读取别名 bEnable。</td><td><strong>范围 / 枚举：</strong>JSON布尔或数值：0=false、非0=true；缺失/字符串/null返回403。</td></tr><tr><td><code class="field-path">request.<wbr>config_<wbr>str.<wbr>bEnable</code></td><td>bool | number</td><td>仅命令 enable_rgb,enable_rgb_awb,enable_rgb_auto_expose,enable_strobe,enable_auto_cover_control,enable_io_control 使用，其他命令不读此字段。；首选 enable，缺失时读取别名 bEnable。</td><td><strong>范围 / 枚举：</strong>JSON布尔或数值：0=false、非0=true；缺失/字符串/null返回403。</td></tr><tr><td><code class="field-path">request.<wbr>config_<wbr>str.<wbr>on</code></td><td>bool | number</td><td>仅命令 turn_on_strobe_laser 使用，其他命令不读此字段。；首选 on，缺失时读取别名 bOn。</td><td><strong>范围 / 枚举：</strong>JSON布尔或数值：0=false、非0=true；缺失/字符串/null返回403。</td></tr><tr><td><code class="field-path">request.<wbr>config_<wbr>str.<wbr>bOn</code></td><td>bool | number</td><td>仅命令 turn_on_strobe_laser 使用，其他命令不读此字段。；首选 on，缺失时读取别名 bOn。</td><td><strong>范围 / 枚举：</strong>JSON布尔或数值：0=false、非0=true；缺失/字符串/null返回403。</td></tr><tr><td><code class="field-path">request.<wbr>config_<wbr>str.<wbr>rgb_<wbr>expose</code></td><td>integer</td><td>仅 set_rgb_expose 使用；优先读取 rgb_expose，缺失时读取别名nValue，不与另一命令字段混用。</td><td><strong>范围 / 枚举：</strong>有限非负整数，最大4294967295（uint32）；否则403。</td></tr><tr><td><code class="field-path">request.<wbr>config_<wbr>str.<wbr>rgb_<wbr>gain</code></td><td>integer</td><td>仅 set_rgb_gain 使用；优先读取 rgb_gain，缺失时读取别名nValue，不与另一命令字段混用。</td><td><strong>范围 / 枚举：</strong>有限非负整数，最大4294967295（uint32）；否则403。</td></tr><tr><td><code class="field-path">request.<wbr>config_<wbr>str.<wbr>nValue</code></td><td>integer</td><td>仅命令 set_rgb_expose,set_rgb_gain 使用，其他命令不读此字段。；首选 rgb_expose/rgb_gain，缺失时读取别名 nValue。</td><td><strong>范围 / 枚举：</strong>有限非负整数，最大4294967295（uint32）；否则403。</td></tr><tr><td><code class="field-path">request.<wbr>config_<wbr>str.<wbr>rgb_<wbr>auto_<wbr>expose_<wbr>thres</code></td><td>number</td><td>仅命令 set_rgb_auto_expose_thres 使用，其他命令不读此字段。；首选 rgb_auto_expose_thres，缺失时读取别名 fExposeThres。</td><td><strong>范围 / 枚举：</strong>有限number且可表示为float；否则403。</td></tr><tr><td><code class="field-path">request.<wbr>config_<wbr>str.<wbr>fExposeThres</code></td><td>number</td><td>仅命令 set_rgb_auto_expose_thres 使用，其他命令不读此字段。；首选 rgb_auto_expose_thres，缺失时读取别名 fExposeThres。</td><td><strong>范围 / 枚举：</strong>有限number且可表示为float；否则403。</td></tr><tr><td><code class="field-path">request.<wbr>config_<wbr>str.<wbr>start_<wbr>pos</code></td><td>integer</td><td>仅命令 set_swing_motor_angle 使用，其他命令不读此字段。</td><td><strong>范围 / 枚举：</strong>两个键都必需，否则403；按整数转换；接口未限制数值范围。</td></tr><tr><td><code class="field-path">request.<wbr>config_<wbr>str.<wbr>end_<wbr>pos</code></td><td>integer</td><td>仅命令 set_swing_motor_angle 使用，其他命令不读此字段。</td><td><strong>范围 / 枚举：</strong>两个键都必需，否则403；按整数转换；接口未限制数值范围。</td></tr><tr><td><code class="field-path">request.<wbr>config_<wbr>str.<wbr>angle</code></td><td>number / integer</td><td>rotate_swing 的目标摆角（toDouble）；set_swing_stop_angle 的停止角、set_swing_end_angle_thres 的扫描结束角阈值（均toInt）。</td><td><strong>赋值：</strong>仅对应命令必填；后两项必须给整数。；<strong>范围 / 枚举：</strong>范围及单位依据当前设备SDK；不提供通用0..90限制。部分分支报缺参后仍会以默认0调用SDK，调用方必须先校验。</td></tr><tr><td><code class="field-path">request.<wbr>config_<wbr>str.<wbr>scan_<wbr>mode</code></td><td>integer</td><td>仅 <code>set_swing_scan_mode</code>：摆动扫描模式。VZ SDK枚举为0 None、1 Once、2 Loop。</td><td><strong>赋值：</strong>建议仅填0/1/2。；<strong>范围 / 枚举：</strong>重要：当前JSON解析仅检查键存在并直接toInt后static_cast，<strong>不</strong>在服务端拒绝其它整数；其它值是否被SDK拒绝取决于设备/SDK，不能称为接口接受枚举。</td></tr><tr><td><code class="field-path">request.<wbr>config_<wbr>str.<wbr>rotate_<wbr>direct</code></td><td>integer</td><td>仅 <code>set_swing_rotate_direct</code>：摆动旋转方向。VZ SDK枚举为0 Clockwise顺时针、1 Counterclockwise逆时针。</td><td><strong>赋值：</strong>建议仅填0或1。；<strong>范围 / 枚举：</strong>当前JSON解析只检查键存在并直接toInt后static_cast，不校验0/1；其它整数没有本层403保证。</td></tr><tr><td><code class="field-path">request.<wbr>config_<wbr>str.<wbr>mseconds</code></td><td>integer</td><td>仅命令 set_swing_stop_time 使用，其他命令不读此字段。</td><td><strong>范围 / 枚举：</strong>键必须存在，否则403；toInt转换，本层未检查范围。</td></tr><tr><td><code class="field-path">request.<wbr>config_<wbr>str.<wbr>near_<wbr>distance</code></td><td>number</td><td>仅 set_swing_motor_work_range：近端工作距离，按toDouble读取。</td><td><strong>赋值：</strong>两个字段须同时提供；不得省略。；<strong>范围 / 枚举：</strong>单位及可用范围以当前设备SDK为准；缺参分支未立即退出，禁止用缺参请求试探。</td></tr><tr><td><code class="field-path">request.<wbr>config_<wbr>str.<wbr>far_<wbr>distance</code></td><td>number</td><td>仅 set_swing_motor_work_range：远端工作距离，按toDouble读取。</td><td><strong>赋值：</strong>两个字段须同时提供；不得省略。；<strong>范围 / 枚举：</strong>单位及可用范围以当前设备SDK为准；缺参分支未立即退出，禁止用缺参请求试探。</td></tr><tr><td><code class="field-path">request.<wbr>config_<wbr>str.<wbr>rgb_<wbr>trigger_<wbr>mode</code></td><td>unsigned integer</td><td>仅 <code>set_rgb_trigger_mode</code>：当前解析分支显式接受的 VZ 触发模式。；首选 rgb_trigger_mode，缺失时读取别名 eTriggerMode。</td><td><strong>赋值：</strong>必须填下列精确数值之一；两个字段名任选其一。；<strong>范围 / 枚举：</strong>0 Slave被动触发；1 Master主动；2 FallingEdge下降沿；3 RisingEdge上升沿；4 LowLevelEnable低电平使能输出；6 ManualTrigger手动；9 Package物流包裹；10 HighFrequenceFallingEdge高帧率下降沿。其它值或非有限非负整数=403。</td></tr><tr><td><code class="field-path">request.<wbr>config_<wbr>str.<wbr>eTriggerMode</code></td><td>unsigned integer</td><td>仅 <code>set_rgb_trigger_mode</code>：当前解析分支显式接受的 VZ 触发模式。；首选 rgb_trigger_mode，缺失时读取别名 eTriggerMode。</td><td><strong>赋值：</strong>必须填下列精确数值之一；两个字段名任选其一。；<strong>范围 / 枚举：</strong>0 Slave被动触发；1 Master主动；2 FallingEdge下降沿；3 RisingEdge上升沿；4 LowLevelEnable低电平使能输出；6 ManualTrigger手动；9 Package物流包裹；10 HighFrequenceFallingEdge高帧率下降沿。其它值或非有限非负整数=403。</td></tr><tr><td><code class="field-path">request.<wbr>config_<wbr>str.<wbr>anti_<wbr>reflect_<wbr>gain_<wbr>type</code></td><td>unsigned integer</td><td>仅 <code>set_anti_reflect_gain_type</code>：抗反光增益档位。；首选 anti_reflect_gain_type，缺失时读取别名 eAntiReflectGainType。</td><td><strong>赋值：</strong>必须填下列精确数值之一；两个字段名任选其一。；<strong>范围 / 枚举：</strong>1 Close；2 Double；4 Quadruple；6 Sextuple；8 Octuple。其它值或非有限非负整数=403。</td></tr><tr><td><code class="field-path">request.<wbr>config_<wbr>str.<wbr>eAntiReflectGainType</code></td><td>unsigned integer</td><td>仅 <code>set_anti_reflect_gain_type</code>：抗反光增益档位。；首选 anti_reflect_gain_type，缺失时读取别名 eAntiReflectGainType。</td><td><strong>赋值：</strong>必须填下列精确数值之一；两个字段名任选其一。；<strong>范围 / 枚举：</strong>1 Close；2 Double；4 Quadruple；6 Sextuple；8 Octuple。其它值或非有限非负整数=403。</td></tr><tr><td><code class="field-path">request.<wbr>config_<wbr>str.<wbr>angle_<wbr>speed</code></td><td>integer</td><td>仅 <code>set_swing_angle_speed</code>：摆动角速度请求。VZ SDK头声明速度常量1、12、24、36、48、60、72、84、96，min=1、max=96。</td><td><strong>赋值：</strong>设备协议若要求离散档位，应使用列出常量。；<strong>范围 / 枚举：</strong>当前JSON解析只检查键存在并toInt；没有强制[1,96]或离散档位校验，不能把SDK头常量误写成本接口403范围。</td></tr><tr><td><code class="field-path">request.<wbr>config_<wbr>str.<wbr>camera_<wbr>config.<wbr>left_<wbr>roi.<wbr>right</code></td><td>integer</td><td>左ROI四边。</td><td><strong>赋值：</strong>left_roi 与 right_roi 必须同时出现，且每个对象必须四键齐全；否则403。；<strong>范围 / 枚举：</strong>目标相机决定最终可用范围；本层无数值界限。</td></tr><tr><td><code class="field-path">request.<wbr>config_<wbr>str.<wbr>camera_<wbr>config.<wbr>left_<wbr>roi.<wbr>top</code></td><td>integer</td><td>左ROI四边。</td><td><strong>赋值：</strong>left_roi 与 right_roi 必须同时出现，且每个对象必须四键齐全；否则403。；<strong>范围 / 枚举：</strong>目标相机决定最终可用范围；本层无数值界限。</td></tr><tr><td><code class="field-path">request.<wbr>config_<wbr>str.<wbr>camera_<wbr>config.<wbr>left_<wbr>roi.<wbr>bottom</code></td><td>integer</td><td>左ROI四边。</td><td><strong>赋值：</strong>left_roi 与 right_roi 必须同时出现，且每个对象必须四键齐全；否则403。；<strong>范围 / 枚举：</strong>目标相机决定最终可用范围；本层无数值界限。</td></tr><tr><td><code class="field-path">request.<wbr>config_<wbr>str.<wbr>camera_<wbr>config.<wbr>right_<wbr>roi.<wbr>right</code></td><td>integer</td><td>右ROI四边。</td><td><strong>赋值：</strong>同左ROI；单独给一侧不会进入ROI写入分支。；<strong>范围 / 枚举：</strong>目标相机决定最终可用范围；失败501。</td></tr><tr><td><code class="field-path">request.<wbr>config_<wbr>str.<wbr>camera_<wbr>config.<wbr>right_<wbr>roi.<wbr>top</code></td><td>integer</td><td>右ROI四边。</td><td><strong>赋值：</strong>同左ROI；单独给一侧不会进入ROI写入分支。；<strong>范围 / 枚举：</strong>目标相机决定最终可用范围；失败501。</td></tr><tr><td><code class="field-path">request.<wbr>config_<wbr>str.<wbr>camera_<wbr>config.<wbr>right_<wbr>roi.<wbr>bottom</code></td><td>integer</td><td>右ROI四边。</td><td><strong>赋值：</strong>同左ROI；单独给一侧不会进入ROI写入分支。；<strong>范围 / 枚举：</strong>目标相机决定最终可用范围；失败501。</td></tr><tr><td><code class="field-path">request.<wbr>config_<wbr>str.<wbr>calib_<wbr>cfg_<wbr>para</code></td><td>object</td><td>仅 set_eye_hand_calib_cfg：标定算法配置。</td><td><strong>赋值：</strong>必填对象，以下11个子键全部必填。报错文本中的 calib_cfg_type 是服务端文案笔误，不是请求键。</td></tr><tr><td><code class="field-path">request.<wbr>config_<wbr>str.<wbr>calib_<wbr>cfg_<wbr>para.<wbr>bUseStereoCalib</code></td><td>boolean</td><td>是否使用双目标定；仅 set_eye_hand_calib_cfg。</td><td><strong>赋值：</strong>必填；使用当前SDK/标定板的已核对配置。；<strong>范围 / 枚举：</strong>服务端检查键存在后作Qt类型转换；枚举、单位与有效范围须按当前SDK确认，不提供猜测默认值。</td></tr><tr><td><code class="field-path">request.<wbr>config_<wbr>str.<wbr>calib_<wbr>cfg_<wbr>para.<wbr>eCalibType</code></td><td>integer</td><td>SDK手眼标定类型枚举；仅 set_eye_hand_calib_cfg。</td><td><strong>赋值：</strong>必填；使用当前SDK/标定板的已核对配置。；<strong>范围 / 枚举：</strong>服务端检查键存在后作Qt类型转换；枚举、单位与有效范围须按当前SDK确认，不提供猜测默认值。</td></tr><tr><td><code class="field-path">request.<wbr>config_<wbr>str.<wbr>calib_<wbr>cfg_<wbr>para.<wbr>eROrder</code></td><td>integer</td><td>SDK旋转顺序枚举；仅 set_eye_hand_calib_cfg。</td><td><strong>赋值：</strong>必填；使用当前SDK/标定板的已核对配置。；<strong>范围 / 枚举：</strong>服务端检查键存在后作Qt类型转换；枚举、单位与有效范围须按当前SDK确认，不提供猜测默认值。</td></tr><tr><td><code class="field-path">request.<wbr>config_<wbr>str.<wbr>calib_<wbr>cfg_<wbr>para.<wbr>eCalibBoardType</code></td><td>integer</td><td>SDK标定板类型枚举；仅 set_eye_hand_calib_cfg。</td><td><strong>赋值：</strong>必填；使用当前SDK/标定板的已核对配置。；<strong>范围 / 枚举：</strong>服务端检查键存在后作Qt类型转换；枚举、单位与有效范围须按当前SDK确认，不提供猜测默认值。</td></tr><tr><td><code class="field-path">request.<wbr>config_<wbr>str.<wbr>calib_<wbr>cfg_<wbr>para.<wbr>nCalibBoardLength</code></td><td>integer</td><td>标定板长度方向数量；仅 set_eye_hand_calib_cfg。</td><td><strong>赋值：</strong>必填；使用当前SDK/标定板的已核对配置。；<strong>范围 / 枚举：</strong>服务端检查键存在后作Qt类型转换；枚举、单位与有效范围须按当前SDK确认，不提供猜测默认值。</td></tr><tr><td><code class="field-path">request.<wbr>config_<wbr>str.<wbr>calib_<wbr>cfg_<wbr>para.<wbr>nCalibBoardWidth</code></td><td>integer</td><td>标定板宽度方向数量；仅 set_eye_hand_calib_cfg。</td><td><strong>赋值：</strong>必填；使用当前SDK/标定板的已核对配置。；<strong>范围 / 枚举：</strong>服务端检查键存在后作Qt类型转换；枚举、单位与有效范围须按当前SDK确认，不提供猜测默认值。</td></tr><tr><td><code class="field-path">request.<wbr>config_<wbr>str.<wbr>calib_<wbr>cfg_<wbr>para.<wbr>dCalibGridEdgeLen</code></td><td>number</td><td>标定格边长；仅 set_eye_hand_calib_cfg。</td><td><strong>赋值：</strong>必填；使用当前SDK/标定板的已核对配置。；<strong>范围 / 枚举：</strong>服务端检查键存在后作Qt类型转换；枚举、单位与有效范围须按当前SDK确认，不提供猜测默认值。</td></tr><tr><td><code class="field-path">request.<wbr>config_<wbr>str.<wbr>calib_<wbr>cfg_<wbr>para.<wbr>dCornerDetectErrThres</code></td><td>number</td><td>角点检测误差阈值；仅 set_eye_hand_calib_cfg。</td><td><strong>赋值：</strong>必填；使用当前SDK/标定板的已核对配置。；<strong>范围 / 枚举：</strong>服务端检查键存在后作Qt类型转换；枚举、单位与有效范围须按当前SDK确认，不提供猜测默认值。</td></tr><tr><td><code class="field-path">request.<wbr>config_<wbr>str.<wbr>calib_<wbr>cfg_<wbr>para.<wbr>bEnableEyeToHandCalibMatrixAdjust</code></td><td>boolean</td><td>是否启用眼在手外矩阵调整；仅 set_eye_hand_calib_cfg。</td><td><strong>赋值：</strong>必填；使用当前SDK/标定板的已核对配置。；<strong>范围 / 枚举：</strong>服务端检查键存在后作Qt类型转换；枚举、单位与有效范围须按当前SDK确认，不提供猜测默认值。</td></tr><tr><td><code class="field-path">request.<wbr>config_<wbr>str.<wbr>calib_<wbr>cfg_<wbr>para.<wbr>dEyeToHandMinCalilbErrThres</code></td><td>number</td><td>眼在手外标定最小误差阈值；Calilb为协议原拼写；仅 set_eye_hand_calib_cfg。</td><td><strong>赋值：</strong>必填；使用当前SDK/标定板的已核对配置。；<strong>范围 / 枚举：</strong>服务端检查键存在后作Qt类型转换；枚举、单位与有效范围须按当前SDK确认，不提供猜测默认值。</td></tr><tr><td><code class="field-path">request.<wbr>config_<wbr>str.<wbr>calib_<wbr>cfg_<wbr>para.<wbr>nEyeToHandMinCalibItemNum</code></td><td>integer</td><td>眼在手外标定最小样本数；仅 set_eye_hand_calib_cfg。</td><td><strong>赋值：</strong>必填；使用当前SDK/标定板的已核对配置。；<strong>范围 / 枚举：</strong>服务端检查键存在后作Qt类型转换；枚举、单位与有效范围须按当前SDK确认，不提供猜测默认值。</td></tr><tr><td><code class="field-path">request.<wbr>config_<wbr>str.<wbr>nPointNum</code></td><td>integer</td><td>仅 get_eye_hand_calib_matrix：标定样本数。</td><td><strong>赋值：</strong>必填整数且至少5；须等于pExtrinsicList与pRobotPointList的长度。；<strong>范围 / 枚举：</strong>调用方拒绝负数、非整数和溢出；服务端先toInt再转unsigned，不能依赖其处理非法负数。</td></tr><tr><td><code class="field-path">request.<wbr>config_<wbr>str.<wbr>pExtrinsicList</code></td><td>array</td><td>仅 get_eye_hand_calib_matrix：相机外参样本。</td><td><strong>赋值：</strong>必填；长度等于nPointNum，与另一列表按下标一一对应。；<strong>范围 / 枚举：</strong>每项可为6个数的数组，或含values的对象；必须来自真实采样，不能填虚构零点。</td></tr><tr><td><code class="field-path">request.<wbr>config_<wbr>str.<wbr>pExtrinsicList[].<wbr>values</code></td><td>number[6]</td><td>对象项写法中的6分量值；也支持直接用6元素数组。</td><td><strong>赋值：</strong>使用对象项时必填values，长度固定6；顺序、坐标系和单位需与标定算法一致。；<strong>范围 / 枚举：</strong>协议不声明通用位姿顺序；不要直接套机器人TCP数据。底层接受null并转0，调用方应禁止此用法。</td></tr><tr><td><code class="field-path">request.<wbr>config_<wbr>str.<wbr>pRobotPointList</code></td><td>array</td><td>仅 get_eye_hand_calib_matrix：对应机器人样本。</td><td><strong>赋值：</strong>必填；长度等于nPointNum，与另一列表按下标一一对应。；<strong>范围 / 枚举：</strong>每项可为6个数的数组，或含values的对象；必须来自真实采样，不能填虚构零点。</td></tr><tr><td><code class="field-path">request.<wbr>config_<wbr>str.<wbr>pRobotPointList[].<wbr>values</code></td><td>number[6]</td><td>对象项写法中的6分量值；也支持直接用6元素数组。</td><td><strong>赋值：</strong>使用对象项时必填values，长度固定6；顺序、坐标系和单位需与标定算法一致。；<strong>范围 / 枚举：</strong>协议不声明通用位姿顺序；不要直接套机器人TCP数据。底层接受null并转0，调用方应禁止此用法。</td></tr><tr><td><code class="field-path">request.<wbr>config_<wbr>str.<wbr>pCalibRefPointList</code></td><td>array</td><td>仅 get_eye_hand_calib_matrix：可选参考样本。</td><td><strong>赋值：</strong>可省略或null；非null时走带参考点的算法分支。；<strong>范围 / 枚举：</strong>每项可为6个数的数组，或含values的对象；必须来自真实采样，不能填虚构零点。</td></tr><tr><td><code class="field-path">request.<wbr>config_<wbr>str.<wbr>pCalibRefPointList[].<wbr>values</code></td><td>number[6]</td><td>对象项写法中的6分量值；也支持直接用6元素数组。</td><td><strong>赋值：</strong>使用对象项时必填values，长度固定6；顺序、坐标系和单位需与标定算法一致。；<strong>范围 / 枚举：</strong>协议不声明通用位姿顺序；不要直接套机器人TCP数据。底层接受null并转0，调用方应禁止此用法。</td></tr></tbody></table></div>
-<h4>JSON 响应字段</h4><div class="table-scroll fields-scroll"><table class="field-table json-field-table"><thead><tr><th>字段路径</th><th>类型</th><th>含义与填写／解析方式</th><th>有效值／限制</th></tr></thead><tbody><tr><td><code class="field-path">response.<wbr>message.<wbr>status</code></td><td>integer</td><td>内层JSON状态。</td><td><strong>范围 / 枚举：</strong>通常200；非法输入400；无设备/SDK失败500。</td></tr><tr><td><code class="field-path">response.<wbr>message.<wbr>message</code></td><td>string</td><td>内层处理文字。</td><td><strong>范围 / 枚举：</strong>可能缺失，消费者需容错。</td></tr><tr><td><code class="field-path">response.<wbr>message.<wbr>connect_<wbr>status</code></td><td>integer</td><td>仅connect_status：1已连接，0未连接。</td><td><strong>范围 / 枚举：</strong>0/1。</td></tr><tr><td><code class="field-path">response.<wbr>message.<wbr>width</code></td><td>integer</td><td>仅get_resolution成功：帧宽。</td><td><strong>范围 / 枚举：</strong>像素。</td></tr><tr><td><code class="field-path">response.<wbr>message.<wbr>height</code></td><td>integer</td><td>仅get_resolution成功：帧高。</td><td><strong>范围 / 枚举：</strong>像素。</td></tr><tr><td><code class="field-path">response.<wbr>message.<wbr>camera_<wbr>config.<wbr>exposure_<wbr>mode</code></td><td>string</td><td>连接或get_camera_config返回；<code>fixed</code>或<code>auto</code>（由SDK枚举映射）。</td><td><strong>范围 / 枚举：</strong>相机连接时才生成。</td></tr><tr><td><code class="field-path">response.<wbr>message.<wbr>camera_<wbr>config.<wbr>exposure</code></td><td>integer</td><td>SDK读取的曝光值。</td><td><strong>范围 / 枚举：</strong>本接口不规定统一单位或范围。</td></tr><tr><td><code class="field-path">response.<wbr>message.<wbr>camera_<wbr>config.<wbr>frame_<wbr>rate</code></td><td>integer</td><td>SDK读取帧率。</td><td><strong>范围 / 枚举：</strong>单位通常fps但此接口未明确声明。</td></tr><tr><td><code class="field-path">response.<wbr>message.<wbr>camera_<wbr>config.<wbr>left_<wbr>gain</code></td><td>integer</td><td>左相机SDK增益。</td><td><strong>范围 / 枚举：</strong>取值范围使用目标设备配置约定。</td></tr><tr><td><code class="field-path">response.<wbr>message.<wbr>camera_<wbr>config.<wbr>right_<wbr>gain</code></td><td>integer</td><td>右相机SDK增益。</td><td><strong>范围 / 枚举：</strong>取值范围使用目标设备配置约定。</td></tr><tr><td><code class="field-path">response.<wbr>message.<wbr>camera_<wbr>config.<wbr>left_<wbr>roi.<wbr>left</code></td><td>number</td><td>ROI left_roi 的 left 边界。</td><td><strong>范围 / 枚举：</strong>像素与坐标约定使用目标相机配置。</td></tr><tr><td><code class="field-path">response.<wbr>message.<wbr>camera_<wbr>config.<wbr>left_<wbr>roi.<wbr>right</code></td><td>number</td><td>ROI left_roi 的 right 边界。</td><td><strong>范围 / 枚举：</strong>像素与坐标约定使用目标相机配置。</td></tr><tr><td><code class="field-path">response.<wbr>message.<wbr>camera_<wbr>config.<wbr>left_<wbr>roi.<wbr>top</code></td><td>number</td><td>ROI left_roi 的 top 边界。</td><td><strong>范围 / 枚举：</strong>像素与坐标约定使用目标相机配置。</td></tr><tr><td><code class="field-path">response.<wbr>message.<wbr>camera_<wbr>config.<wbr>left_<wbr>roi.<wbr>bottom</code></td><td>number</td><td>ROI left_roi 的 bottom 边界。</td><td><strong>范围 / 枚举：</strong>像素与坐标约定使用目标相机配置。</td></tr><tr><td><code class="field-path">response.<wbr>message.<wbr>camera_<wbr>config.<wbr>right_<wbr>roi.<wbr>left</code></td><td>number</td><td>ROI right_roi 的 left 边界。</td><td><strong>范围 / 枚举：</strong>像素与坐标约定使用目标相机配置。</td></tr><tr><td><code class="field-path">response.<wbr>message.<wbr>camera_<wbr>config.<wbr>right_<wbr>roi.<wbr>right</code></td><td>number</td><td>ROI right_roi 的 right 边界。</td><td><strong>范围 / 枚举：</strong>像素与坐标约定使用目标相机配置。</td></tr><tr><td><code class="field-path">response.<wbr>message.<wbr>camera_<wbr>config.<wbr>right_<wbr>roi.<wbr>top</code></td><td>number</td><td>ROI right_roi 的 top 边界。</td><td><strong>范围 / 枚举：</strong>像素与坐标约定使用目标相机配置。</td></tr><tr><td><code class="field-path">response.<wbr>message.<wbr>camera_<wbr>config.<wbr>right_<wbr>roi.<wbr>bottom</code></td><td>number</td><td>ROI right_roi 的 bottom 边界。</td><td><strong>范围 / 枚举：</strong>像素与坐标约定使用目标相机配置。</td></tr><tr><td><code class="field-path">response.<wbr>message.<wbr>laser_<wbr>config.<wbr>laser_<wbr>off</code></td><td>boolean</td><td>SDK读取的激光灯关闭状态；true=关闭。</td><td><strong>范围 / 枚举：</strong>连接时才生成。</td></tr><tr><td><code class="field-path">response.<wbr>message.<wbr>laser_<wbr>config.<wbr>laser_<wbr>power_<wbr>level</code></td><td>integer</td><td>SDK读取激光功率等级。</td><td><strong>范围 / 枚举：</strong>等级枚举及范围以目标设备协议为准。</td></tr><tr><td><code class="field-path">response.<wbr>message.<wbr>laser_<wbr>config.<wbr>laser_<wbr>power_<wbr>range.<wbr>min</code></td><td>integer</td><td>SDK返回的激光功率等级下界。</td><td><strong>范围 / 枚举：</strong>单位未声明。</td></tr><tr><td><code class="field-path">response.<wbr>message.<wbr>laser_<wbr>config.<wbr>laser_<wbr>power_<wbr>range.<wbr>max</code></td><td>integer</td><td>SDK返回的激光功率等级上界。</td><td><strong>范围 / 枚举：</strong>单位未声明。</td></tr><tr><td><code class="field-path">response.<wbr>message.<wbr>laser_<wbr>status</code></td><td>boolean</td><td>仅laser_status：SDK激光灯使能状态。</td><td><strong>范围 / 枚举：</strong>true/false。</td></tr><tr><td><code class="field-path">response.<wbr>message.<wbr>error_<wbr>type</code></td><td>integer</td><td>DriverError：1001未连接、1002参数非法、2001SDK失败、3001未知命令。</td><td><strong>范围 / 枚举：</strong>status与此字段必须共同解释。</td></tr><tr><td><code class="field-path">response.<wbr>message.<wbr>error_<wbr>type_<wbr>name</code></td><td>string</td><td>DriverError 名称。</td><td><strong>范围 / 枚举：</strong>NotConnected/InvalidParam/SdkFailure/UnknownCommand 等。</td></tr><tr><td><code class="field-path">response.<wbr>message.<wbr>ranges.<wbr>&lt;frame_<wbr>rate|expose|gain|laser_<wbr>light|frame_<wbr>rate_<wbr>without_<wbr>color_<wbr>data|frame_<wbr>rate_<wbr>with_<wbr>color_<wbr>data|strobe_<wbr>time_<wbr>ratio&gt;.<wbr>min/max</code></td><td>integer</td><td><code>get_param_range</code> 返回的当前SDK参数上下界。</td><td><strong>范围 / 枚举：</strong>每一项由部署相机SDK给出。</td></tr></tbody></table></div>
-<p class="module-link">完整流程：<a href="#examples-camera">对应模块示例</a></p><h4>请求数据</h4><div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-json">{
-  &quot;config_str&quot;: &quot;{\&quot;command_type\&quot;:\&quot;connect_status\&quot;}&quot;
+<h4>字段路径怎样对应 Python</h4><p><code>request.config_str.camera_config.frame_rate</code> 是文档的层级表示。ROS 请求只有一个字符串字段 <code>config_str</code>；把它解析成 JSON 后，才有 <code>camera_config</code> 和 <code>frame_rate</code>。<code>request</code> 是方向标记，不是 JSON 键；不要把整条点分路径作为字典键，也不要把 <code>camera_config</code> 再转成字符串。</p>
+<div class="table-scroll"><table>
+<tr><td>文档里的路径</td><td>Python 里怎么写</td><td>所在层</td></tr>
+<tr><td><code>request.config_str</code></td><td><code>json.dumps(payload)</code></td><td>ROS 请求的字符串字段</td></tr>
+<tr><td><code>request.config_str.command_type</code></td><td><code>payload[&quot;command_type&quot;]</code></td><td>选择配置接口中的功能</td></tr>
+<tr><td><code>request.config_str.camera_config.frame_rate</code></td><td><code>payload[&quot;camera_config&quot;][&quot;frame_rate&quot;]</code></td><td>相机参数对象中的帧率</td></tr>
+<tr><td><code>request.config_str.camera_config.right_gain</code></td><td><code>payload[&quot;camera_config&quot;][&quot;right_gain&quot;]</code></td><td>相机参数对象中的右增益</td></tr>
+<tr><td><code>request.config_str.camera_config.left_roi.left</code></td><td><code>payload[&quot;camera_config&quot;][&quot;left_roi&quot;][&quot;left&quot;]</code></td><td>左ROI对象中的左边界</td></tr>
+<tr><td><code>request.config_str.laser_config.laser_off</code></td><td><code>payload[&quot;laser_config&quot;][&quot;laser_off&quot;]</code></td><td>激光配置对象中的开关</td></tr>
+<tr><td><code>request.config_str.enable</code></td><td><code>payload[&quot;enable&quot;]</code></td><td>JSON 顶层，适用于启用类命令</td></tr>
+<tr><td><code>request.config_str.rgb_gain</code></td><td><code>payload[&quot;rgb_gain&quot;]</code></td><td>JSON 顶层，适用于 <code>set_rgb_gain</code></td></tr>
+<tr><td><code>response.message.camera_config.frame_rate</code></td><td><code>result[&quot;camera_config&quot;][&quot;frame_rate&quot;]</code></td><td><code>result = json.loads(response.message)</code> 后的回读值</td></tr>
+</table></div>
+<p><strong>以2026-11-02修改帧率的历史实例为例，Python 字典这样填写：</strong> 以下为调用片段；完整环境、回读和恢复见 <code>camera_configuration.py</code>。</p>
+<div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-python">payload = {
+    &quot;command_type&quot;: &quot;camera_configuration&quot;,
+    &quot;camera_config&quot;: {&quot;frame_rate&quot;: 202},
+}
+result = call(client, payload)</code></pre></div>
+<p><code>_common.call()</code> 自动执行 <code>json.dumps(payload)</code>；SDK 再把这个字符串填入 ROS 请求的 <code>config_str</code>。返回时，<code>call()</code> 自动执行 <code>json.loads(response.message)</code>，所以示例打印的是解析后的 JSON。</p>
+<p><strong>只读查询则只需要命令，不需要填写要读的字段：</strong></p>
+<div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-python">payload = {&quot;command_type&quot;: &quot;get_camera_config&quot;}
+result = call(client, payload)
+frame_rate = result[&quot;camera_config&quot;][&quot;frame_rate&quot;]</code></pre></div>
+<p><strong>ROS 外层的字段结构如下。</strong> 这是按本次数据重建的 JSON 表示，用于说明字符串封装；实际请求和响应是 ROS 消息，不是把这个外层字典再发送给 <code>call()</code>。键顺序和空格不参与业务判断。</p>
+<div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-json">{&quot;config_str&quot;: &quot;{\&quot;command_type\&quot;:\&quot;get_rgb_trigger_mode\&quot;}&quot;}</code></pre></div>
+<div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-json">{&quot;message&quot;: &quot;{\&quot;data\&quot;:1,\&quot;status\&quot;:200}&quot;}</code></pre></div>
+<p><strong>原生 rclpy 对应写法（与上面的 SDK 写法二选一）：</strong></p>
+<div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-python">request = LaserConfig.Request()
+request.config_str = json.dumps(payload)
+# response 是调用 /at/camera_node/config 获得的 LaserConfig.Response
+result = json.loads(response.message)</code></pre></div>
+<p>外层 <code>LaserConfig.Response</code> 只有 <code>message</code>，没有 <code>status</code> 或 <code>camera_config</code> 属性。表中各命令的参数按 <code>command_type</code> 分支填写，不要把全部字段拼进同一次请求。</p>
+<section class="verified-exchanges"><h4>本机实测：请求数据、响应与回读</h4>
+<p>以下为2026-11-05完整扫描和2026-11-02配置读写的成功实例，日期分别标注。客户端192.168.1.252 → ROS系统主机192.168.1.101 → 3D相机192.168.1.20（Vizum Laser Robot Eye，ID019319）。请求对象按当次已校验脚本还原，响应取自运行日志，仅调整JSON排版；这些是本台设备的实测值，不是通用默认值。config_str是JSON字符串，下方展示的是其解析前对应的对象；返回展示json.loads(response.message)。</p>
+<details open><summary>2026-11-05：曝光600、帧率200、ROI写入与最终回读（扫描成功）</summary>
+<p>这是一次完整扫描中的真实配置记录。先写入相机参数，再设置摆动工作距离和起止位置，最后回读；中间的摆动命令见下方独立实例。扫描得到912214个点，823个数据块均已下载核对。</p>
+<div class="table-scroll"><table>
+<tr><td>阶段</td><td>帧率字段</td><td>左ROI横向</td><td>右ROI横向</td></tr>
+<tr><td>相机配置写入后</td><td>200</td><td>0～1216</td><td>0～1216</td></tr>
+<tr><td>工作距离等全部参数设置后</td><td>200</td><td>0～256</td><td>960～1216</td></tr>
+<tr><td>采集完成后</td><td>973</td><td>0～256</td><td>960～1216</td></tr>
+</table></div>
+<p>ROI纵向均为0～1920。973是配置回读值，不是实测每秒帧数；不能承诺扫描一直保持200帧。</p>
+<p>对应脚本：<a href="../examples/python/camera/camera_scan_demo.py">examples/python/camera/camera_scan_demo.py</a></p>
+<h5>① 写入相机配置，响应确认帧率200</h5>
+<p>发送：<code>config_str</code> 内的 JSON 对象</p><div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-json">{
+  &quot;command_type&quot;: &quot;camera_configuration&quot;,
+  &quot;camera_config&quot;: {
+    &quot;exposure&quot;: 600,
+    &quot;exposure_mode&quot;: &quot;fixed&quot;,
+    &quot;frame_rate&quot;: 200,
+    &quot;left_gain&quot;: 1,
+    &quot;right_gain&quot;: 1,
+    &quot;left_roi&quot;: {
+      &quot;left&quot;: 0,
+      &quot;right&quot;: 1216,
+      &quot;top&quot;: 0,
+      &quot;bottom&quot;: 1920
+    },
+    &quot;right_roi&quot;: {
+      &quot;left&quot;: 0,
+      &quot;right&quot;: 1216,
+      &quot;top&quot;: 0,
+      &quot;bottom&quot;: 1920
+    }
+  }
 }</code></pre></div>
-<h4>只读连接状态请求</h4><div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-json">{
+<p>收到：<code>json.loads(response.message)</code> 的完整结果</p><div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-json">{
+  &quot;camera_config&quot;: {
+    &quot;exposure&quot;: 600,
+    &quot;exposure_mode&quot;: &quot;fixed&quot;,
+    &quot;frame_rate&quot;: 200,
+    &quot;left_gain&quot;: 1,
+    &quot;left_roi&quot;: {
+      &quot;bottom&quot;: 1920,
+      &quot;left&quot;: 0,
+      &quot;right&quot;: 1216,
+      &quot;top&quot;: 0
+    },
+    &quot;right_gain&quot;: 1,
+    &quot;right_roi&quot;: {
+      &quot;bottom&quot;: 1920,
+      &quot;left&quot;: 0,
+      &quot;right&quot;: 1216,
+      &quot;top&quot;: 0
+    }
+  },
+  &quot;frame_rate&quot;: 200,
+  &quot;left_gain&quot;: 1,
+  &quot;left_roi&quot;: {
+    &quot;bottom&quot;: 1920,
+    &quot;left&quot;: 0,
+    &quot;right&quot;: 1216,
+    &quot;top&quot;: 0
+  },
+  &quot;message&quot;: &quot;ROI configured&quot;,
+  &quot;right_roi&quot;: {
+    &quot;bottom&quot;: 1920,
+    &quot;left&quot;: 0,
+    &quot;right&quot;: 1216,
+    &quot;top&quot;: 0
+  },
+  &quot;status&quot;: 200
+}</code></pre></div>
+<h5>② 工作距离和扫描范围设置完成后，读取最终配置</h5>
+<p>发送：<code>config_str</code> 内的 JSON 对象</p><div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-json">{
+  &quot;command_type&quot;: &quot;get_camera_config&quot;
+}</code></pre></div>
+<p>收到：<code>json.loads(response.message)</code> 的完整结果</p><div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-json">{
+  &quot;camera_config&quot;: {
+    &quot;exposure&quot;: 600,
+    &quot;exposure_mode&quot;: &quot;fixed&quot;,
+    &quot;frame_rate&quot;: 200,
+    &quot;left_gain&quot;: 1,
+    &quot;left_roi&quot;: {
+      &quot;bottom&quot;: 1920,
+      &quot;left&quot;: 0,
+      &quot;right&quot;: 256,
+      &quot;top&quot;: 0
+    },
+    &quot;right_gain&quot;: 1,
+    &quot;right_roi&quot;: {
+      &quot;bottom&quot;: 1920,
+      &quot;left&quot;: 960,
+      &quot;right&quot;: 1216,
+      &quot;top&quot;: 0
+    }
+  },
+  &quot;message&quot;: &quot;Camera configuration retrieved&quot;,
+  &quot;status&quot;: 200
+}</code></pre></div>
+<h5>③ 扫描和下载完成后再次读取，帧率字段为973</h5>
+<p>发送：<code>config_str</code> 内的 JSON 对象</p><div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-json">{
+  &quot;command_type&quot;: &quot;get_camera_config&quot;
+}</code></pre></div>
+<p>收到：<code>json.loads(response.message)</code> 的完整结果</p><div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-json">{
+  &quot;camera_config&quot;: {
+    &quot;exposure&quot;: 600,
+    &quot;exposure_mode&quot;: &quot;fixed&quot;,
+    &quot;frame_rate&quot;: 973,
+    &quot;left_gain&quot;: 1,
+    &quot;left_roi&quot;: {
+      &quot;bottom&quot;: 1920,
+      &quot;left&quot;: 0,
+      &quot;right&quot;: 256,
+      &quot;top&quot;: 0
+    },
+    &quot;right_gain&quot;: 1,
+    &quot;right_roi&quot;: {
+      &quot;bottom&quot;: 1920,
+      &quot;left&quot;: 960,
+      &quot;right&quot;: 1216,
+      &quot;top&quot;: 0
+    }
+  },
+  &quot;message&quot;: &quot;Camera configuration retrieved&quot;,
+  &quot;status&quot;: 200
+}</code></pre></div>
+<p><strong>本次结论：</strong>相机配置写入成功；工作距离设置改变ROI，扫描驱动改变帧率字段，实际值以对应阶段回读为准。本例结束后保留扫描参数。</p></details>
+<details><summary>2026-11-05：连接相机、读取设备范围、设置激光功率3</summary>
+<p>ROS系统主机192.168.1.101负责控制相机192.168.1.20。连接使用设备GUID。扫描准备阶段设置laser_off=true（先关灯），不要求提前手动点亮激光；后续采集由扫描驱动控制灯光和自动保护盖。连接响应中的scanweld_synced表示这台部署还同步了设备记录，不代表扫描完成。</p>
+<p>对应脚本：<a href="../examples/python/camera/camera_scan_demo.py">examples/python/camera/camera_scan_demo.py</a></p>
+<h5>① 连接设备，完整返回本台部署的连接与同步信息</h5>
+<p>发送：<code>config_str</code> 内的 JSON 对象</p><div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-json">{
+  &quot;command_type&quot;: &quot;connect&quot;,
+  &quot;guid&quot;: &quot;a397a255-53be-41fc-996b-521413e9e22d&quot;
+}</code></pre></div>
+<p>收到：<code>json.loads(response.message)</code> 的完整结果</p><div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-json">{
+  &quot;camera_config&quot;: {
+    &quot;exposure&quot;: 600,
+    &quot;exposure_mode&quot;: &quot;fixed&quot;,
+    &quot;frame_rate&quot;: 486,
+    &quot;left_gain&quot;: 1,
+    &quot;left_roi&quot;: {
+      &quot;bottom&quot;: 1920,
+      &quot;left&quot;: 0,
+      &quot;right&quot;: 256,
+      &quot;top&quot;: 0
+    },
+    &quot;right_gain&quot;: 1,
+    &quot;right_roi&quot;: {
+      &quot;bottom&quot;: 1920,
+      &quot;left&quot;: 960,
+      &quot;right&quot;: 1216,
+      &quot;top&quot;: 0
+    }
+  },
+  &quot;connected_device&quot;: {
+    &quot;guid&quot;: &quot;a397a255-53be-41fc-996b-521413e9e22d&quot;,
+    &quot;sensor_ip&quot;: &quot;192.168.1.20&quot;
+  },
+  &quot;laser_config&quot;: {
+    &quot;laser_off&quot;: true,
+    &quot;laser_power_level&quot;: 3,
+    &quot;laser_power_range&quot;: {
+      &quot;max&quot;: 3,
+      &quot;min&quot;: 0
+    }
+  },
+  &quot;message&quot;: &quot;Device connected and scanweld device record synchronized&quot;,
+  &quot;physical_connected&quot;: true,
+  &quot;scanweld_sensor&quot;: {
+    &quot;auto_connect&quot;: false,
+    &quot;detail&quot;: &quot;3D static capture; calibration not validated&quot;,
+    &quot;id&quot;: 2,
+    &quot;job_topic&quot;: &quot;/scanweld/camera3d_job&quot;,
+    &quot;pcd_path&quot;: &quot;/opt/atweld/runtime_bundle/camera3d/production.pcd&quot;,
+    &quot;ros_job_publish_enabled&quot;: false,
+    &quot;sensor_ip&quot;: &quot;192.168.1.20&quot;,
+    &quot;sensor_name&quot;: &quot;Vizum 3D&quot;,
+    &quot;sensor_port&quot;: 0,
+    &quot;sensor_type&quot;: &quot;surface_3d&quot;,
+    &quot;valid&quot;: true
+  },
+  &quot;scanweld_synced&quot;: true,
+  &quot;status&quot;: 200
+}</code></pre></div>
+<h5>② 独立查询连接状态</h5>
+<p>发送：<code>config_str</code> 内的 JSON 对象</p><div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-json">{
   &quot;command_type&quot;: &quot;connect_status&quot;
 }</code></pre></div>
-<h4>laser_configuration 写入结构</h4><div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-json">{
+<p>收到：<code>json.loads(response.message)</code> 的完整结果</p><div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-json">{
+  &quot;connect_status&quot;: 1,
+  &quot;status&quot;: 200
+}</code></pre></div>
+<h5>③ 读取此时的参数范围</h5>
+<p>发送：<code>config_str</code> 内的 JSON 对象</p><div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-json">{
+  &quot;command_type&quot;: &quot;get_param_range&quot;
+}</code></pre></div>
+<p>收到：<code>json.loads(response.message)</code> 的完整结果</p><div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-json">{
+  &quot;message&quot;: &quot;Parameter range retrieved&quot;,
+  &quot;ranges&quot;: {
+    &quot;expose&quot;: {
+      &quot;max&quot;: 1000000,
+      &quot;min&quot;: 20
+    },
+    &quot;frame_rate&quot;: {
+      &quot;max&quot;: 486,
+      &quot;min&quot;: 1
+    },
+    &quot;frame_rate_with_color_data&quot;: {
+      &quot;max&quot;: 486,
+      &quot;min&quot;: 1
+    },
+    &quot;frame_rate_without_color_data&quot;: {
+      &quot;max&quot;: 486,
+      &quot;min&quot;: 1
+    },
+    &quot;gain&quot;: {
+      &quot;max&quot;: 255,
+      &quot;min&quot;: 1
+    },
+    &quot;laser_light&quot;: {
+      &quot;max&quot;: 3,
+      &quot;min&quot;: 0
+    },
+    &quot;strobe_time_ratio&quot;: {
+      &quot;max&quot;: 100,
+      &quot;min&quot;: 0
+    }
+  },
+  &quot;status&quot;: 200
+}</code></pre></div>
+<h5>④ 设置功率3，并保持准备阶段关灯</h5>
+<p>发送：<code>config_str</code> 内的 JSON 对象</p><div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-json">{
   &quot;command_type&quot;: &quot;laser_configuration&quot;,
   &quot;laser_config&quot;: {
     &quot;laser_off&quot;: true,
-    &quot;laser_power_level&quot;: 0
+    &quot;laser_power_level&quot;: 3
   }
 }</code></pre></div>
-<h4>RGB触发模式（服务端严格验证的枚举）</h4><div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-json">{
-  &quot;command_type&quot;: &quot;set_rgb_trigger_mode&quot;,
-  &quot;rgb_trigger_mode&quot;: 1
+<p>收到：<code>json.loads(response.message)</code> 的完整结果</p><div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-json">{
+  &quot;laser_config&quot;: {
+    &quot;laser_off&quot;: true,
+    &quot;laser_power_level&quot;: 3,
+    &quot;laser_power_range&quot;: {
+      &quot;max&quot;: 3,
+      &quot;min&quot;: 0
+    }
+  },
+  &quot;message&quot;: &quot;Laser configured&quot;,
+  &quot;status&quot;: 200
 }</code></pre></div>
-<h4>抗反光增益（服务端严格验证的枚举）</h4><div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-json">{
-  &quot;command_type&quot;: &quot;set_anti_reflect_gain_type&quot;,
-  &quot;anti_reflect_gain_type&quot;: 4
+<h5>⑤ 启动扫描前回读激光配置</h5>
+<p>发送：<code>config_str</code> 内的 JSON 对象</p><div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-json">{
+  &quot;command_type&quot;: &quot;get_laser_config&quot;
 }</code></pre></div>
-<h4>摆动扫描/方向（SDK枚举，当前JSON入口不枚举校验）</h4><div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-json">{
+<p>收到：<code>json.loads(response.message)</code> 的完整结果</p><div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-json">{
+  &quot;laser_config&quot;: {
+    &quot;laser_off&quot;: true,
+    &quot;laser_power_level&quot;: 3,
+    &quot;laser_power_range&quot;: {
+      &quot;max&quot;: 3,
+      &quot;min&quot;: 0
+    }
+  },
+  &quot;message&quot;: &quot;Laser configuration retrieved&quot;,
+  &quot;status&quot;: 200
+}</code></pre></div>
+<p><strong>本次结论：</strong>连接状态1，功率回读3，准备阶段laser_off=true。范围查询发生在扫描前，不能用当时的帧率上限486判定后续回读973一定非法。</p></details>
+<details><summary>2026-11-05：单次摆动扫描的完整参数与回读</summary>
+<p>以下命令按本次真实顺序发送；它们都属于 /at/camera_node/config。目标扫描端点0～60和速度50先与get_swing_motor_info报告范围核对。接口没有定义当前编码器读数与配置端点的共同零点，本例不将编码器读数转换成运动目标。</p>
+<p>对应脚本：<a href="../examples/python/camera/camera_scan_demo.py">examples/python/camera/camera_scan_demo.py</a></p>
+<h5>① 读取设备报告的角度和速度范围</h5>
+<p>发送：<code>config_str</code> 内的 JSON 对象</p><div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-json">{
+  &quot;command_type&quot;: &quot;get_swing_motor_info&quot;
+}</code></pre></div>
+<p>收到：<code>json.loads(response.message)</code> 的完整结果</p><div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-json">{
+  &quot;data&quot;: {
+    &quot;fEndAngleThres&quot;: 5,
+    &quot;nEndAngle&quot;: 60,
+    &quot;nMaxAngle&quot;: 60,
+    &quot;nMaxSpeed&quot;: 768,
+    &quot;nMinSpeed&quot;: 1,
+    &quot;nMotorMaxAngle&quot;: 60,
+    &quot;nSpeed&quot;: 50,
+    &quot;nStartAngle&quot;: 0,
+    &quot;nStopAngle&quot;: 30
+  },
+  &quot;status&quot;: 200
+}</code></pre></div>
+<h5>② 启用摆动电机</h5>
+<p>发送：<code>config_str</code> 内的 JSON 对象</p><div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-json">{
+  &quot;command_type&quot;: &quot;enable_swing_motor&quot;
+}</code></pre></div>
+<p>收到：<code>json.loads(response.message)</code> 的完整结果</p><div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-json">{
+  &quot;status&quot;: 200
+}</code></pre></div>
+<h5>③ 单次扫描模式</h5>
+<p>发送：<code>config_str</code> 内的 JSON 对象</p><div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-json">{
   &quot;command_type&quot;: &quot;set_swing_scan_mode&quot;,
   &quot;scan_mode&quot;: 1
 }</code></pre></div>
-<h4>连接请求：本次设备示例（其他设备必须替换为发现结果中的 GUID）</h4><div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-json">{
-  &quot;config_str&quot;: &quot;{\&quot;command_type\&quot;:\&quot;connect\&quot;,\&quot;guid\&quot;:\&quot;a397a255-53be-41fc-996b-521413e9e22d\&quot;}&quot;
+<p>收到：<code>json.loads(response.message)</code> 的完整结果</p><div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-json">{
+  &quot;status&quot;: 200
 }</code></pre></div>
-<h4>连接成功后的状态查询响应：message 内部仍为 JSON 字符串</h4><div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-json">{
-  &quot;message&quot;: &quot;{\&quot;connect_status\&quot;:1,\&quot;status\&quot;:200}&quot;
+<h5>④ 扫描方向</h5>
+<p>发送：<code>config_str</code> 内的 JSON 对象</p><div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-json">{
+  &quot;command_type&quot;: &quot;set_swing_rotate_direct&quot;,
+  &quot;rotate_direct&quot;: 0
 }</code></pre></div>
-<h4>曝光与双目ROI完整请求（环境样例；写入前按目标设备回读调整）</h4><div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-json">{
-  &quot;config_str&quot;: &quot;{\&quot;command_type\&quot;: \&quot;camera_configuration\&quot;, \&quot;camera_config\&quot;: {\&quot;exposure\&quot;: 260, \&quot;frame_rate\&quot;: 203, \&quot;left_gain\&quot;: 1, \&quot;left_roi\&quot;: {\&quot;bottom\&quot;: 1920, \&quot;left\&quot;: 32, \&quot;right\&quot;: 256, \&quot;top\&quot;: 0}, \&quot;right_gain\&quot;: 1, \&quot;right_roi\&quot;: {\&quot;bottom\&quot;: 1920, \&quot;left\&quot;: 1088, \&quot;right\&quot;: 1312, \&quot;top\&quot;: 0}}}&quot;
+<p>收到：<code>json.loads(response.message)</code> 的完整结果</p><div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-json">{
+  &quot;status&quot;: 200
 }</code></pre></div>
-<h4>标定配置输入模板（占位符不可直接提交）</h4><div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-json">{
-  &quot;config_str&quot;: &quot;{\&quot;command_type\&quot;: \&quot;set_eye_hand_calib_cfg\&quot;, \&quot;calib_cfg_para\&quot;: {\&quot;bUseStereoCalib\&quot;: \&quot;&lt;按字段表填写真实boolean值&gt;\&quot;, \&quot;eCalibType\&quot;: \&quot;&lt;按字段表填写真实integer值&gt;\&quot;, \&quot;eROrder\&quot;: \&quot;&lt;按字段表填写真实integer值&gt;\&quot;, \&quot;eCalibBoardType\&quot;: \&quot;&lt;按字段表填写真实integer值&gt;\&quot;, \&quot;nCalibBoardLength\&quot;: \&quot;&lt;按字段表填写真实integer值&gt;\&quot;, \&quot;nCalibBoardWidth\&quot;: \&quot;&lt;按字段表填写真实integer值&gt;\&quot;, \&quot;dCalibGridEdgeLen\&quot;: \&quot;&lt;按字段表填写真实number值&gt;\&quot;, \&quot;dCornerDetectErrThres\&quot;: \&quot;&lt;按字段表填写真实number值&gt;\&quot;, \&quot;bEnableEyeToHandCalibMatrixAdjust\&quot;: \&quot;&lt;按字段表填写真实boolean值&gt;\&quot;, \&quot;dEyeToHandMinCalilbErrThres\&quot;: \&quot;&lt;按字段表填写真实number值&gt;\&quot;, \&quot;nEyeToHandMinCalibItemNum\&quot;: \&quot;&lt;按字段表填写真实integer值&gt;\&quot;}}&quot;
+<h5>⑤ 扫描速度</h5>
+<p>发送：<code>config_str</code> 内的 JSON 对象</p><div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-json">{
+  &quot;command_type&quot;: &quot;set_swing_angle_speed&quot;,
+  &quot;angle_speed&quot;: 50
 }</code></pre></div>
-<h4>标定矩阵计算输入模板（占位符不可直接提交）</h4><div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-json">{
-  &quot;config_str&quot;: &quot;{\&quot;command_type\&quot;: \&quot;get_eye_hand_calib_matrix\&quot;, \&quot;nPointNum\&quot;: \&quot;&lt;真实样本数，至少5&gt;\&quot;, \&quot;pExtrinsicList\&quot;: \&quot;&lt;N个6分量样本，数组或values对象&gt;\&quot;, \&quot;pRobotPointList\&quot;: \&quot;&lt;N个逐项对应的6分量样本&gt;\&quot;, \&quot;pCalibRefPointList\&quot;: \&quot;&lt;可选参考样本数组；不用时删除此键&gt;\&quot;}&quot;
+<p>收到：<code>json.loads(response.message)</code> 的完整结果</p><div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-json">{
+  &quot;status&quot;: 200
 }</code></pre></div>
+<h5>⑥ 停顿时间</h5>
+<p>发送：<code>config_str</code> 内的 JSON 对象</p><div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-json">{
+  &quot;command_type&quot;: &quot;set_swing_stop_time&quot;,
+  &quot;mseconds&quot;: 500
+}</code></pre></div>
+<p>收到：<code>json.loads(response.message)</code> 的完整结果</p><div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-json">{
+  &quot;status&quot;: 200
+}</code></pre></div>
+<h5>⑦ 工作距离，同时影响最终ROI</h5>
+<p>发送：<code>config_str</code> 内的 JSON 对象</p><div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-json">{
+  &quot;command_type&quot;: &quot;set_swing_motor_work_range&quot;,
+  &quot;near_distance&quot;: 300.0,
+  &quot;far_distance&quot;: 800.0
+}</code></pre></div>
+<p>收到：<code>json.loads(response.message)</code> 的完整结果</p><div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-json">{
+  &quot;status&quot;: 200
+}</code></pre></div>
+<h5>⑧ 起止位置</h5>
+<p>发送：<code>config_str</code> 内的 JSON 对象</p><div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-json">{
+  &quot;command_type&quot;: &quot;set_swing_motor_angle&quot;,
+  &quot;start_pos&quot;: 0,
+  &quot;end_pos&quot;: 60
+}</code></pre></div>
+<p>收到：<code>json.loads(response.message)</code> 的完整结果</p><div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-json">{
+  &quot;status&quot;: 200
+}</code></pre></div>
+<h5>⑨ 回读单次模式</h5>
+<p>发送：<code>config_str</code> 内的 JSON 对象</p><div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-json">{
+  &quot;command_type&quot;: &quot;get_swing_scan_mode&quot;
+}</code></pre></div>
+<p>收到：<code>json.loads(response.message)</code> 的完整结果</p><div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-json">{
+  &quot;data&quot;: 1,
+  &quot;status&quot;: 200
+}</code></pre></div>
+<h5>⑩ 回读方向</h5>
+<p>发送：<code>config_str</code> 内的 JSON 对象</p><div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-json">{
+  &quot;command_type&quot;: &quot;get_swing_rotate_direct&quot;
+}</code></pre></div>
+<p>收到：<code>json.loads(response.message)</code> 的完整结果</p><div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-json">{
+  &quot;data&quot;: 0,
+  &quot;status&quot;: 200
+}</code></pre></div>
+<h5>⑪ 回读速度</h5>
+<p>发送：<code>config_str</code> 内的 JSON 对象</p><div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-json">{
+  &quot;command_type&quot;: &quot;get_swing_angle_speed&quot;
+}</code></pre></div>
+<p>收到：<code>json.loads(response.message)</code> 的完整结果</p><div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-json">{
+  &quot;data&quot;: 50,
+  &quot;status&quot;: 200
+}</code></pre></div>
+<h5>⑫ 回读起止位置</h5>
+<p>发送：<code>config_str</code> 内的 JSON 对象</p><div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-json">{
+  &quot;command_type&quot;: &quot;get_swing_motor_angle&quot;
+}</code></pre></div>
+<p>收到：<code>json.loads(response.message)</code> 的完整结果</p><div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-json">{
+  &quot;data&quot;: {
+    &quot;end_pos&quot;: 60,
+    &quot;start_pos&quot;: 0
+  },
+  &quot;status&quot;: 200
+}</code></pre></div>
+<h5>⑬ 回读电机使能</h5>
+<p>发送：<code>config_str</code> 内的 JSON 对象</p><div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-json">{
+  &quot;command_type&quot;: &quot;is_enable_swing_motor&quot;
+}</code></pre></div>
+<p>收到：<code>json.loads(response.message)</code> 的完整结果</p><div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-json">{
+  &quot;data&quot;: true,
+  &quot;status&quot;: 200
+}</code></pre></div>
+<p><strong>本次结论：</strong>所有设置请求status=200；模式1、方向0、速度50、起止0～60、电机使能true均独立回读一致。停顿时间和工作距离无对应getter，只确认请求成功且后续扫描成功，不声称已独立回读这两项，也不猜测工作距离单位。</p></details>
+<details><summary>2026-11-05：扫描结束后的关灯与电机停机核对</summary>
+<p>这是清理阶段的配置接口调用。控制接口的stop_capture、close_laser和close_cover见控制实例。C版手动灯开关在关闭频闪后执行；随后恢复运行前的频闪与自动保护盖开关。曝光、ROI、功率及摆动参数保留本次扫描值。</p>
+<p>对应脚本：<a href="../examples/python/camera/camera_scan_demo.py">examples/python/camera/camera_scan_demo.py</a></p>
+<h5>① 禁用摆动电机</h5>
+<p>发送：<code>config_str</code> 内的 JSON 对象</p><div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-json">{
+  &quot;command_type&quot;: &quot;disable_swing_motor&quot;
+}</code></pre></div>
+<p>收到：<code>json.loads(response.message)</code> 的完整结果</p><div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-json">{
+  &quot;status&quot;: 200
+}</code></pre></div>
+<h5>② 暂时关闭频闪模式</h5>
+<p>发送：<code>config_str</code> 内的 JSON 对象</p><div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-json">{
+  &quot;command_type&quot;: &quot;enable_strobe&quot;,
+  &quot;enable&quot;: false
+}</code></pre></div>
+<p>收到：<code>json.loads(response.message)</code> 的完整结果</p><div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-json">{
+  &quot;data&quot;: false,
+  &quot;status&quot;: 200
+}</code></pre></div>
+<h5>③ 关闭C版手动激光</h5>
+<p>发送：<code>config_str</code> 内的 JSON 对象</p><div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-json">{
+  &quot;command_type&quot;: &quot;turn_on_strobe_laser&quot;,
+  &quot;on&quot;: false
+}</code></pre></div>
+<p>收到：<code>json.loads(response.message)</code> 的完整结果</p><div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-json">{
+  &quot;data&quot;: false,
+  &quot;status&quot;: 200
+}</code></pre></div>
+<h5>④ 恢复原频闪开关</h5>
+<p>发送：<code>config_str</code> 内的 JSON 对象</p><div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-json">{
+  &quot;command_type&quot;: &quot;enable_strobe&quot;,
+  &quot;enable&quot;: true
+}</code></pre></div>
+<p>收到：<code>json.loads(response.message)</code> 的完整结果</p><div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-json">{
+  &quot;data&quot;: true,
+  &quot;status&quot;: 200
+}</code></pre></div>
+<h5>⑤ 恢复原自动保护盖开关</h5>
+<p>发送：<code>config_str</code> 内的 JSON 对象</p><div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-json">{
+  &quot;command_type&quot;: &quot;enable_auto_cover_control&quot;,
+  &quot;enable&quot;: true
+}</code></pre></div>
+<p>收到：<code>json.loads(response.message)</code> 的完整结果</p><div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-json">{
+  &quot;data&quot;: true,
+  &quot;status&quot;: 200
+}</code></pre></div>
+<h5>⑥ 独立回读电机已禁用</h5>
+<p>发送：<code>config_str</code> 内的 JSON 对象</p><div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-json">{
+  &quot;command_type&quot;: &quot;is_enable_swing_motor&quot;
+}</code></pre></div>
+<p>收到：<code>json.loads(response.message)</code> 的完整结果</p><div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-json">{
+  &quot;data&quot;: false,
+  &quot;status&quot;: 200
+}</code></pre></div>
+<h5>⑦ 独立回读普通激光状态已关闭</h5>
+<p>发送：<code>config_str</code> 内的 JSON 对象</p><div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-json">{
+  &quot;command_type&quot;: &quot;laser_status&quot;
+}</code></pre></div>
+<p>收到：<code>json.loads(response.message)</code> 的完整结果</p><div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-json">{
+  &quot;laser_status&quot;: false,
+  &quot;message&quot;: &quot;Laser status retrieved&quot;,
+  &quot;status&quot;: 200
+}</code></pre></div>
+<h5>⑧ 独立回读C版手动激光已关闭</h5>
+<p>发送：<code>config_str</code> 内的 JSON 对象</p><div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-json">{
+  &quot;command_type&quot;: &quot;is_turn_on_strobe_laser&quot;
+}</code></pre></div>
+<p>收到：<code>json.loads(response.message)</code> 的完整结果</p><div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-json">{
+  &quot;data&quot;: false,
+  &quot;status&quot;: 200
+}</code></pre></div>
+<h5>⑨ 独立回读频闪开关</h5>
+<p>发送：<code>config_str</code> 内的 JSON 对象</p><div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-json">{
+  &quot;command_type&quot;: &quot;is_enable_strobe&quot;
+}</code></pre></div>
+<p>收到：<code>json.loads(response.message)</code> 的完整结果</p><div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-json">{
+  &quot;data&quot;: true,
+  &quot;status&quot;: 200
+}</code></pre></div>
+<h5>⑩ 独立回读自动保护盖开关</h5>
+<p>发送：<code>config_str</code> 内的 JSON 对象</p><div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-json">{
+  &quot;command_type&quot;: &quot;is_enable_auto_cover_control&quot;
+}</code></pre></div>
+<p>收到：<code>json.loads(response.message)</code> 的完整结果</p><div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-json">{
+  &quot;data&quot;: true,
+  &quot;status&quot;: 200
+}</code></pre></div>
+<p><strong>本次结论：</strong>电机使能false、laser_status=false、C版手动激光false；频闪和自动保护盖开关恢复为true。开关状态不等于盖子位置，盖子关闭仅有控制命令成功响应。</p></details>
+<details><summary>2026-11-02：1. 读取曝光、帧率、增益和 ROI（成功）</summary>
+<p>读取命令只带 command_type。下方返回是相机在修改前的完整配置：曝光260、固定曝光、帧率203、左右增益1。</p>
+<p>对应脚本：<a href="../examples/python/camera/get_camera_config.py">examples/python/camera/get_camera_config.py</a></p>
+<h5>读取原配置</h5>
+<p>发送：<code>config_str</code> 内的 JSON 对象</p><div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-json">{
+  &quot;command_type&quot;: &quot;get_camera_config&quot;
+}</code></pre></div>
+<p>收到：<code>json.loads(response.message)</code> 的完整结果</p><div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-json">{
+  &quot;camera_config&quot;: {
+    &quot;exposure&quot;: 260,
+    &quot;exposure_mode&quot;: &quot;fixed&quot;,
+    &quot;frame_rate&quot;: 203,
+    &quot;left_gain&quot;: 1,
+    &quot;left_roi&quot;: {
+      &quot;bottom&quot;: 1920,
+      &quot;left&quot;: 32,
+      &quot;right&quot;: 256,
+      &quot;top&quot;: 0
+    },
+    &quot;right_gain&quot;: 1,
+    &quot;right_roi&quot;: {
+      &quot;bottom&quot;: 1920,
+      &quot;left&quot;: 1088,
+      &quot;right&quot;: 1312,
+      &quot;top&quot;: 0
+    }
+  },
+  &quot;message&quot;: &quot;Camera configuration retrieved&quot;,
+  &quot;status&quot;: 200
+}</code></pre></div>
+<p><strong>本次结论：</strong>status=200且camera_config字段完整。本例只读取，不会修改参数。</p></details>
+<details><summary>2026-11-02：2. 帧率203 → 202 → 203：写入、回读、恢复（成功）</summary>
+<p>脚本先读取当前帧率和允许范围，再选相邻值；本次203改为202。只有frame_rate被写入。每一步都是独立服务请求；最后在finally中恢复原值并核对完整配置。</p>
+<p>对应脚本：<a href="../examples/python/camera/camera_configuration.py">examples/python/camera/camera_configuration.py</a></p>
+<h5>① 读取原值：203</h5>
+<p>发送：<code>config_str</code> 内的 JSON 对象</p><div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-json">{
+  &quot;command_type&quot;: &quot;get_camera_config&quot;
+}</code></pre></div>
+<p>收到：<code>json.loads(response.message)</code> 的完整结果</p><div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-json">{
+  &quot;camera_config&quot;: {
+    &quot;exposure&quot;: 260,
+    &quot;exposure_mode&quot;: &quot;fixed&quot;,
+    &quot;frame_rate&quot;: 203,
+    &quot;left_gain&quot;: 1,
+    &quot;left_roi&quot;: {
+      &quot;bottom&quot;: 1920,
+      &quot;left&quot;: 32,
+      &quot;right&quot;: 256,
+      &quot;top&quot;: 0
+    },
+    &quot;right_gain&quot;: 1,
+    &quot;right_roi&quot;: {
+      &quot;bottom&quot;: 1920,
+      &quot;left&quot;: 1088,
+      &quot;right&quot;: 1312,
+      &quot;top&quot;: 0
+    }
+  },
+  &quot;message&quot;: &quot;Camera configuration retrieved&quot;,
+  &quot;status&quot;: 200
+}</code></pre></div>
+<h5>② 设置新值：202</h5>
+<p>发送：<code>config_str</code> 内的 JSON 对象</p><div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-json">{
+  &quot;command_type&quot;: &quot;camera_configuration&quot;,
+  &quot;camera_config&quot;: {
+    &quot;frame_rate&quot;: 202
+  }
+}</code></pre></div>
+<p>收到：<code>json.loads(response.message)</code> 的完整结果</p><div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-json">{
+  &quot;camera_config&quot;: {
+    &quot;exposure&quot;: 260,
+    &quot;exposure_mode&quot;: &quot;fixed&quot;,
+    &quot;frame_rate&quot;: 202,
+    &quot;left_gain&quot;: 1,
+    &quot;left_roi&quot;: {
+      &quot;bottom&quot;: 1920,
+      &quot;left&quot;: 32,
+      &quot;right&quot;: 256,
+      &quot;top&quot;: 0
+    },
+    &quot;right_gain&quot;: 1,
+    &quot;right_roi&quot;: {
+      &quot;bottom&quot;: 1920,
+      &quot;left&quot;: 1088,
+      &quot;right&quot;: 1312,
+      &quot;top&quot;: 0
+    }
+  },
+  &quot;frame_rate&quot;: 202,
+  &quot;message&quot;: &quot;Frame rate set&quot;,
+  &quot;status&quot;: 200
+}</code></pre></div>
+<h5>③ 独立回读：202</h5>
+<p>发送：<code>config_str</code> 内的 JSON 对象</p><div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-json">{
+  &quot;command_type&quot;: &quot;get_camera_config&quot;
+}</code></pre></div>
+<p>收到：<code>json.loads(response.message)</code> 的完整结果</p><div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-json">{
+  &quot;camera_config&quot;: {
+    &quot;exposure&quot;: 260,
+    &quot;exposure_mode&quot;: &quot;fixed&quot;,
+    &quot;frame_rate&quot;: 202,
+    &quot;left_gain&quot;: 1,
+    &quot;left_roi&quot;: {
+      &quot;bottom&quot;: 1920,
+      &quot;left&quot;: 32,
+      &quot;right&quot;: 256,
+      &quot;top&quot;: 0
+    },
+    &quot;right_gain&quot;: 1,
+    &quot;right_roi&quot;: {
+      &quot;bottom&quot;: 1920,
+      &quot;left&quot;: 1088,
+      &quot;right&quot;: 1312,
+      &quot;top&quot;: 0
+    }
+  },
+  &quot;message&quot;: &quot;Camera configuration retrieved&quot;,
+  &quot;status&quot;: 200
+}</code></pre></div>
+<h5>④ 恢复原值：203</h5>
+<p>发送：<code>config_str</code> 内的 JSON 对象</p><div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-json">{
+  &quot;command_type&quot;: &quot;camera_configuration&quot;,
+  &quot;camera_config&quot;: {
+    &quot;frame_rate&quot;: 203
+  }
+}</code></pre></div>
+<p>收到：<code>json.loads(response.message)</code> 的完整结果</p><div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-json">{
+  &quot;camera_config&quot;: {
+    &quot;exposure&quot;: 260,
+    &quot;exposure_mode&quot;: &quot;fixed&quot;,
+    &quot;frame_rate&quot;: 203,
+    &quot;left_gain&quot;: 1,
+    &quot;left_roi&quot;: {
+      &quot;bottom&quot;: 1920,
+      &quot;left&quot;: 32,
+      &quot;right&quot;: 256,
+      &quot;top&quot;: 0
+    },
+    &quot;right_gain&quot;: 1,
+    &quot;right_roi&quot;: {
+      &quot;bottom&quot;: 1920,
+      &quot;left&quot;: 1088,
+      &quot;right&quot;: 1312,
+      &quot;top&quot;: 0
+    }
+  },
+  &quot;frame_rate&quot;: 203,
+  &quot;message&quot;: &quot;Frame rate set&quot;,
+  &quot;status&quot;: 200
+}</code></pre></div>
+<h5>⑤ 独立回读：203</h5>
+<p>发送：<code>config_str</code> 内的 JSON 对象</p><div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-json">{
+  &quot;command_type&quot;: &quot;get_camera_config&quot;
+}</code></pre></div>
+<p>收到：<code>json.loads(response.message)</code> 的完整结果</p><div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-json">{
+  &quot;camera_config&quot;: {
+    &quot;exposure&quot;: 260,
+    &quot;exposure_mode&quot;: &quot;fixed&quot;,
+    &quot;frame_rate&quot;: 203,
+    &quot;left_gain&quot;: 1,
+    &quot;left_roi&quot;: {
+      &quot;bottom&quot;: 1920,
+      &quot;left&quot;: 32,
+      &quot;right&quot;: 256,
+      &quot;top&quot;: 0
+    },
+    &quot;right_gain&quot;: 1,
+    &quot;right_roi&quot;: {
+      &quot;bottom&quot;: 1920,
+      &quot;left&quot;: 1088,
+      &quot;right&quot;: 1312,
+      &quot;top&quot;: 0
+    }
+  },
+  &quot;message&quot;: &quot;Camera configuration retrieved&quot;,
+  &quot;status&quot;: 200
+}</code></pre></div>
+<p><strong>本次结论：</strong>写入后的getter回读为202，恢复后为203；曝光、增益、ROI等完整配置与修改前一致。</p></details>
+<details><summary>2026-11-02：3. 读取相机分辨率（成功）</summary>
+<p>读取返回顶层width和height，没有camera_config包裹。</p>
+<p>对应脚本：<a href="../examples/python/camera/get_resolution.py">examples/python/camera/get_resolution.py</a></p>
+<h5>读取分辨率</h5>
+<p>发送：<code>config_str</code> 内的 JSON 对象</p><div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-json">{
+  &quot;command_type&quot;: &quot;get_resolution&quot;
+}</code></pre></div>
+<p>收到：<code>json.loads(response.message)</code> 的完整结果</p><div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-json">{
+  &quot;height&quot;: 2129,
+  &quot;message&quot;: &quot;Resolution retrieved&quot;,
+  &quot;status&quot;: 200,
+  &quot;width&quot;: 1340
+}</code></pre></div>
+<p><strong>本次结论：</strong>按本次返回读取width和height；无需填写宽高参数。</p></details>
+<details><summary>2026-11-02：4. 读取参数范围（成功）</summary>
+<p>本次16:05读取的帧率范围为1～486；范围可能随设备配置变化，应在修改前重新读取。expose是相机曝光范围，不应直接拿来判断独立RGB曝光参数。</p>
+<p>对应脚本：<a href="../examples/python/camera/get_param_range.py">examples/python/camera/get_param_range.py</a></p>
+<h5>读取参数范围</h5>
+<p>发送：<code>config_str</code> 内的 JSON 对象</p><div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-json">{
+  &quot;command_type&quot;: &quot;get_param_range&quot;
+}</code></pre></div>
+<p>收到：<code>json.loads(response.message)</code> 的完整结果</p><div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-json">{
+  &quot;message&quot;: &quot;Parameter range retrieved&quot;,
+  &quot;ranges&quot;: {
+    &quot;expose&quot;: {
+      &quot;max&quot;: 1000000,
+      &quot;min&quot;: 20
+    },
+    &quot;frame_rate&quot;: {
+      &quot;max&quot;: 486,
+      &quot;min&quot;: 1
+    },
+    &quot;frame_rate_with_color_data&quot;: {
+      &quot;max&quot;: 486,
+      &quot;min&quot;: 1
+    },
+    &quot;frame_rate_without_color_data&quot;: {
+      &quot;max&quot;: 486,
+      &quot;min&quot;: 1
+    },
+    &quot;gain&quot;: {
+      &quot;max&quot;: 255,
+      &quot;min&quot;: 1
+    },
+    &quot;laser_light&quot;: {
+      &quot;max&quot;: 3,
+      &quot;min&quot;: 0
+    },
+    &quot;strobe_time_ratio&quot;: {
+      &quot;max&quot;: 100,
+      &quot;min&quot;: 0
+    }
+  },
+  &quot;status&quot;: 200
+}</code></pre></div>
+<p><strong>本次结论：</strong>从ranges中取具体参数的min/max；本次帧率202和203均在范围内。</p></details>
+<details><summary>2026-11-02：5. 读取激光配置（成功，只读）</summary>
+<p>读取请求不带laser_config；该对象位于返回中。laser_off=true表示关闭，功率等级3不表示正在出光。</p>
+<p>对应脚本：<a href="../examples/python/camera/get_laser_config.py">examples/python/camera/get_laser_config.py</a></p>
+<h5>读取激光配置</h5>
+<p>发送：<code>config_str</code> 内的 JSON 对象</p><div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-json">{
+  &quot;command_type&quot;: &quot;get_laser_config&quot;
+}</code></pre></div>
+<p>收到：<code>json.loads(response.message)</code> 的完整结果</p><div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-json">{
+  &quot;laser_config&quot;: {
+    &quot;laser_off&quot;: true,
+    &quot;laser_power_level&quot;: 3,
+    &quot;laser_power_range&quot;: {
+      &quot;max&quot;: 3,
+      &quot;min&quot;: 0
+    }
+  },
+  &quot;message&quot;: &quot;Laser configuration retrieved&quot;,
+  &quot;status&quot;: 200
+}</code></pre></div>
+<p><strong>本次结论：</strong>返回laser_off=true、laser_power_level=3、功率范围0～3；本例没有发送开关激光命令。</p></details>
+</section>
+<h4>JSON 请求字段</h4><div class="table-scroll fields-scroll"><table class="field-table json-field-table"><thead><tr><th>字段路径</th><th>类型</th><th>含义与填写／解析方式</th><th>有效值／限制</th></tr></thead><tbody><tr><td><code class="field-path">request.<wbr>config_<wbr>str.<wbr>command_<wbr>type</code></td><td>string</td><td>VZ配置命令，可选值：connect、disconnect、connect_status、camera_configuration、laser_configuration、get_param_range、get_camera_config、get_resolution、get_laser_config、laser_status。大小写必须匹配。</td><td><strong>赋值：</strong>必填；大小写敏感。当前VZ分支接受：<code>connect</code>、<code>disconnect</code>、<code>connect_status</code>、<code>camera_configuration</code>、<code>laser_configuration</code>、<code>get_param_range</code>、<code>get_camera_config</code>、<code>get_resolution</code>、<code>get_laser_config</code>、<code>laser_status</code>、<code>set_eye_hand_calib_cfg</code>、<code>get_eye_hand_calib_cfg</code>、<code>get_calib_board_extrinsic</code>、<code>get_detected_calib_board_info</code>、<code>get_eye_hand_calib_matrix</code>、<code>enable_swing_motor</code>、<code>disable_swing_motor</code>、<code>reboot_swing</code>、<code>is_enable_swing_motor</code>、<code>set_swing_angle_speed</code>、<code>get_swing_angle_speed</code>、<code>set_swing_motor_angle</code>、<code>get_swing_motor_angle</code>、<code>rotate_swing</code>、<code>rotate_swing_to_start</code>、<code>set_swing_cur_start_pos</code>、<code>set_swing_cur_end_pos</code>、<code>set_swing_scan_mode</code>、<code>get_swing_scan_mode</code>、<code>get_swing_motor_info</code>、<code>get_swing_cur_angle</code>、<code>set_swing_stop_time</code>、<code>set_swing_rotate_direct</code>、<code>get_swing_rotate_direct</code>、<code>set_swing_stop_angle</code>、<code>get_swing_stop_angle</code>、<code>set_swing_end_angle_thres</code>、<code>get_swing_end_angle_thres</code>、<code>set_swing_motor_work_range</code>、<code>enable_global_denoise</code>、<code>disable_global_denoise</code>、<code>is_enable_global_denoise</code>、<code>is_support_rgb</code>、<code>enable_rgb</code>、<code>is_enable_rgb</code>、<code>enable_rgb_awb</code>、<code>is_enable_rgb_awb</code>、<code>enable_rgb_auto_expose</code>、<code>is_enable_rgb_auto_expose</code>、<code>enable_strobe</code>、<code>is_enable_strobe</code>、<code>turn_on_strobe_laser</code>、<code>is_turn_on_strobe_laser</code>、<code>enable_auto_cover_control</code>、<code>is_enable_auto_cover_control</code>、<code>enable_io_control</code>、<code>is_enable_io_control</code>、<code>set_rgb_expose</code>、<code>get_rgb_expose</code>、<code>set_rgb_gain</code>、<code>get_rgb_gain</code>、<code>set_rgb_trigger_mode</code>、<code>get_rgb_trigger_mode</code>、<code>set_rgb_auto_expose_thres</code>、<code>get_rgb_auto_expose_thres</code>、<code>set_anti_reflect_gain_type</code>、<code>get_anti_reflect_gain_type</code>、<code>format_detect_roi</code>。；<strong>范围 / 枚举：</strong>大小写精确；空/未知命令的最终结果依driver分支。</td></tr><tr><td><code class="field-path">request.<wbr>config_<wbr>str.<wbr>guid</code></td><td>string</td><td>仅connect使用：来自实际sensor_search_result的GUID，不是IP。</td><td><strong>赋值：</strong>command_type=connect时必填；<strong>范围 / 枚举：</strong>空/不存在时500。</td></tr><tr><td><code class="field-path">request.<wbr>config_<wbr>str.<wbr>frame_<wbr>id</code></td><td>string</td><td>可选；存在时保存进VZ driver的frame_id_。</td><td><strong>赋值：</strong>可选；<strong>范围 / 枚举：</strong>ATPointCloud不含frame_id字段，不可假定传播。</td></tr><tr><td><code class="field-path">request.<wbr>config_<wbr>str.<wbr>camera_<wbr>config</code></td><td>object</td><td>仅 command_type=<code>camera_configuration</code> 的写入对象。</td><td><strong>赋值：</strong>该命令必填；缺失=403/error_type=1002。；<strong>范围 / 枚举：</strong>见子字段。</td></tr><tr><td><code class="field-path">request.<wbr>config_<wbr>str.<wbr>camera_<wbr>config.<wbr>exposure</code></td><td>integer</td><td>固定曝光请求值。</td><td><strong>赋值：</strong>可选；20..100000按输入值设置，超出范围时改为200，不返回范围错误。；<strong>范围 / 枚举：</strong>建议20..100000；单位当前接口未声明。</td></tr><tr><td><code class="field-path">request.<wbr>config_<wbr>str.<wbr>camera_<wbr>config.<wbr>frame_<wbr>rate</code></td><td>integer</td><td>帧率请求。</td><td><strong>赋值：</strong>可选；&lt;=0先取设备min（min为0则1）；其余夹到SDK查询的min/max。；<strong>范围 / 枚举：</strong>实际范围由 get_param_range 的 ranges.frame_rate 返回。</td></tr><tr><td><code class="field-path">request.<wbr>config_<wbr>str.<wbr>camera_<wbr>config.<wbr>left_<wbr>gain</code></td><td>integer</td><td>左相机增益。</td><td><strong>赋值：</strong>可选；超范围立即403。；<strong>范围 / 枚举：</strong>0..255。</td></tr><tr><td><code class="field-path">request.<wbr>config_<wbr>str.<wbr>camera_<wbr>config.<wbr>right_<wbr>gain</code></td><td>integer</td><td>右相机增益。</td><td><strong>赋值：</strong>可选；超范围立即403。；<strong>范围 / 枚举：</strong>0..255。</td></tr><tr><td><code class="field-path">request.<wbr>config_<wbr>str.<wbr>camera_<wbr>config.<wbr>left_<wbr>roi.<wbr>left</code></td><td>integer</td><td>左ROI四边。</td><td><strong>赋值：</strong>left_roi 与 right_roi 必须同时出现，且每个对象必须四键齐全；否则403。；<strong>范围 / 枚举：</strong>目标相机决定最终可用范围；本层无数值界限。</td></tr><tr><td><code class="field-path">request.<wbr>config_<wbr>str.<wbr>camera_<wbr>config.<wbr>right_<wbr>roi.<wbr>left</code></td><td>integer</td><td>右ROI四边。</td><td><strong>赋值：</strong>同左ROI；单独给一侧不会进入ROI写入分支。；<strong>范围 / 枚举：</strong>目标相机决定最终可用范围；失败501。</td></tr><tr><td><code class="field-path">request.<wbr>config_<wbr>str.<wbr>laser_<wbr>config</code></td><td>object</td><td>仅 command_type=<code>laser_configuration</code> 的写入对象。</td><td><strong>赋值：</strong>该命令必填；缺失=403/error_type=1002。；<strong>范围 / 枚举：</strong>可只含一个可写成员。</td></tr><tr><td><code class="field-path">request.<wbr>config_<wbr>str.<wbr>laser_<wbr>config.<wbr>laser_<wbr>off</code></td><td>boolean</td><td>true关闭激光；false打开。</td><td><strong>赋值：</strong>可选；使用JSON布尔值。；<strong>范围 / 枚举：</strong>SDK错误将 status 设为SDK返回值、error_type=2001（不保证500）。</td></tr><tr><td><code class="field-path">request.<wbr>config_<wbr>str.<wbr>laser_<wbr>config.<wbr>laser_<wbr>power_<wbr>level</code></td><td>integer</td><td>SDK激光功率等级。</td><td><strong>赋值：</strong>可选；直接传SDK。；<strong>范围 / 枚举：</strong>本层没有数值范围；先用返回 laser_power_range 现场确认。SDK错误状态是SDK返回值。</td></tr><tr><td><code class="field-path">request.<wbr>config_<wbr>str.<wbr>enable</code></td><td>bool | number</td><td>仅命令 enable_rgb,enable_rgb_awb,enable_rgb_auto_expose,enable_strobe,enable_auto_cover_control,enable_io_control 使用，其他命令不读此字段。；首选 enable，缺失时读取别名 bEnable。</td><td><strong>范围 / 枚举：</strong>JSON布尔或数值：0=false、非0=true；缺失/字符串/null返回403。</td></tr><tr><td><code class="field-path">request.<wbr>config_<wbr>str.<wbr>bEnable</code></td><td>bool | number</td><td>仅命令 enable_rgb,enable_rgb_awb,enable_rgb_auto_expose,enable_strobe,enable_auto_cover_control,enable_io_control 使用，其他命令不读此字段。；首选 enable，缺失时读取别名 bEnable。</td><td><strong>范围 / 枚举：</strong>JSON布尔或数值：0=false、非0=true；缺失/字符串/null返回403。</td></tr><tr><td><code class="field-path">request.<wbr>config_<wbr>str.<wbr>on</code></td><td>bool | number</td><td>仅命令 turn_on_strobe_laser 使用，其他命令不读此字段。；首选 on，缺失时读取别名 bOn。</td><td><strong>范围 / 枚举：</strong>JSON布尔或数值：0=false、非0=true；缺失/字符串/null返回403。</td></tr><tr><td><code class="field-path">request.<wbr>config_<wbr>str.<wbr>bOn</code></td><td>bool | number</td><td>仅命令 turn_on_strobe_laser 使用，其他命令不读此字段。；首选 on，缺失时读取别名 bOn。</td><td><strong>范围 / 枚举：</strong>JSON布尔或数值：0=false、非0=true；缺失/字符串/null返回403。</td></tr><tr><td><code class="field-path">request.<wbr>config_<wbr>str.<wbr>rgb_<wbr>expose</code></td><td>integer</td><td>仅 set_rgb_expose 使用；优先读取 rgb_expose，缺失时读取别名nValue，不与另一命令字段混用。</td><td><strong>范围 / 枚举：</strong>有限非负整数，最大4294967295（uint32）；否则403。</td></tr><tr><td><code class="field-path">request.<wbr>config_<wbr>str.<wbr>rgb_<wbr>gain</code></td><td>integer</td><td>仅 set_rgb_gain 使用；优先读取 rgb_gain，缺失时读取别名nValue，不与另一命令字段混用。</td><td><strong>范围 / 枚举：</strong>有限非负整数，最大4294967295（uint32）；否则403。</td></tr><tr><td><code class="field-path">request.<wbr>config_<wbr>str.<wbr>nValue</code></td><td>integer</td><td>仅命令 set_rgb_expose,set_rgb_gain 使用，其他命令不读此字段。；首选 rgb_expose/rgb_gain，缺失时读取别名 nValue。</td><td><strong>范围 / 枚举：</strong>有限非负整数，最大4294967295（uint32）；否则403。</td></tr><tr><td><code class="field-path">request.<wbr>config_<wbr>str.<wbr>rgb_<wbr>auto_<wbr>expose_<wbr>thres</code></td><td>number</td><td>仅命令 set_rgb_auto_expose_thres 使用，其他命令不读此字段。；首选 rgb_auto_expose_thres，缺失时读取别名 fExposeThres。</td><td><strong>范围 / 枚举：</strong>有限number且可表示为float；否则403。</td></tr><tr><td><code class="field-path">request.<wbr>config_<wbr>str.<wbr>fExposeThres</code></td><td>number</td><td>仅命令 set_rgb_auto_expose_thres 使用，其他命令不读此字段。；首选 rgb_auto_expose_thres，缺失时读取别名 fExposeThres。</td><td><strong>范围 / 枚举：</strong>有限number且可表示为float；否则403。</td></tr><tr><td><code class="field-path">request.<wbr>config_<wbr>str.<wbr>start_<wbr>pos</code></td><td>integer</td><td>仅命令 set_swing_motor_angle 使用，其他命令不读此字段。</td><td><strong>范围 / 枚举：</strong>两个键都必需，否则403；按整数转换；接口未限制数值范围。</td></tr><tr><td><code class="field-path">request.<wbr>config_<wbr>str.<wbr>end_<wbr>pos</code></td><td>integer</td><td>仅命令 set_swing_motor_angle 使用，其他命令不读此字段。</td><td><strong>范围 / 枚举：</strong>两个键都必需，否则403；按整数转换；接口未限制数值范围。</td></tr><tr><td><code class="field-path">request.<wbr>config_<wbr>str.<wbr>angle</code></td><td>number / integer</td><td>rotate_swing 的目标摆角（toDouble）；set_swing_stop_angle 的停止角、set_swing_end_angle_thres 的扫描结束角阈值（均toInt）。</td><td><strong>赋值：</strong>仅对应命令必填；后两项必须给整数。；<strong>范围 / 枚举：</strong>范围及单位依据当前设备SDK；不提供通用0..90限制。部分分支报缺参后仍会以默认0调用SDK，调用方必须先校验。</td></tr><tr><td><code class="field-path">request.<wbr>config_<wbr>str.<wbr>scan_<wbr>mode</code></td><td>integer</td><td>仅 <code>set_swing_scan_mode</code>：摆动扫描模式。VZ SDK枚举为0 None、1 Once、2 Loop。</td><td><strong>赋值：</strong>建议仅填0/1/2。；<strong>范围 / 枚举：</strong>重要：当前JSON解析仅检查键存在并直接toInt后static_cast，<strong>不</strong>在服务端拒绝其它整数；其它值是否被SDK拒绝取决于设备/SDK，不能称为接口接受枚举。</td></tr><tr><td><code class="field-path">request.<wbr>config_<wbr>str.<wbr>rotate_<wbr>direct</code></td><td>integer</td><td>仅 <code>set_swing_rotate_direct</code>：摆动旋转方向。VZ SDK枚举为0 Clockwise顺时针、1 Counterclockwise逆时针。</td><td><strong>赋值：</strong>建议仅填0或1。；<strong>范围 / 枚举：</strong>当前JSON解析只检查键存在并直接toInt后static_cast，不校验0/1；其它整数没有本层403保证。</td></tr><tr><td><code class="field-path">request.<wbr>config_<wbr>str.<wbr>mseconds</code></td><td>integer</td><td>仅命令 set_swing_stop_time 使用，其他命令不读此字段。</td><td><strong>范围 / 枚举：</strong>键必须存在，否则403；toInt转换，本层未检查范围。</td></tr><tr><td><code class="field-path">request.<wbr>config_<wbr>str.<wbr>near_<wbr>distance</code></td><td>number</td><td>仅 set_swing_motor_work_range：近端工作距离，按toDouble读取。</td><td><strong>赋值：</strong>两个字段须同时提供；不得省略。；<strong>范围 / 枚举：</strong>单位及可用范围以当前设备SDK为准；缺参分支未立即退出，禁止用缺参请求试探。</td></tr><tr><td><code class="field-path">request.<wbr>config_<wbr>str.<wbr>far_<wbr>distance</code></td><td>number</td><td>仅 set_swing_motor_work_range：远端工作距离，按toDouble读取。</td><td><strong>赋值：</strong>两个字段须同时提供；不得省略。；<strong>范围 / 枚举：</strong>单位及可用范围以当前设备SDK为准；缺参分支未立即退出，禁止用缺参请求试探。</td></tr><tr><td><code class="field-path">request.<wbr>config_<wbr>str.<wbr>rgb_<wbr>trigger_<wbr>mode</code></td><td>unsigned integer</td><td>仅 <code>set_rgb_trigger_mode</code>：当前解析分支显式接受的 VZ 触发模式。；首选 rgb_trigger_mode，缺失时读取别名 eTriggerMode。</td><td><strong>赋值：</strong>必须填下列精确数值之一；两个字段名任选其一。；<strong>范围 / 枚举：</strong>0 Slave被动触发；1 Master主动；2 FallingEdge下降沿；3 RisingEdge上升沿；4 LowLevelEnable低电平使能输出；6 ManualTrigger手动；9 Package物流包裹；10 HighFrequenceFallingEdge高帧率下降沿。其它值或非有限非负整数=403。</td></tr><tr><td><code class="field-path">request.<wbr>config_<wbr>str.<wbr>eTriggerMode</code></td><td>unsigned integer</td><td>仅 <code>set_rgb_trigger_mode</code>：当前解析分支显式接受的 VZ 触发模式。；首选 rgb_trigger_mode，缺失时读取别名 eTriggerMode。</td><td><strong>赋值：</strong>必须填下列精确数值之一；两个字段名任选其一。；<strong>范围 / 枚举：</strong>0 Slave被动触发；1 Master主动；2 FallingEdge下降沿；3 RisingEdge上升沿；4 LowLevelEnable低电平使能输出；6 ManualTrigger手动；9 Package物流包裹；10 HighFrequenceFallingEdge高帧率下降沿。其它值或非有限非负整数=403。</td></tr><tr><td><code class="field-path">request.<wbr>config_<wbr>str.<wbr>anti_<wbr>reflect_<wbr>gain_<wbr>type</code></td><td>unsigned integer</td><td>仅 <code>set_anti_reflect_gain_type</code>：抗反光增益档位。；首选 anti_reflect_gain_type，缺失时读取别名 eAntiReflectGainType。</td><td><strong>赋值：</strong>必须填下列精确数值之一；两个字段名任选其一。；<strong>范围 / 枚举：</strong>1 Close；2 Double；4 Quadruple；6 Sextuple；8 Octuple。其它值或非有限非负整数=403。</td></tr><tr><td><code class="field-path">request.<wbr>config_<wbr>str.<wbr>eAntiReflectGainType</code></td><td>unsigned integer</td><td>仅 <code>set_anti_reflect_gain_type</code>：抗反光增益档位。；首选 anti_reflect_gain_type，缺失时读取别名 eAntiReflectGainType。</td><td><strong>赋值：</strong>必须填下列精确数值之一；两个字段名任选其一。；<strong>范围 / 枚举：</strong>1 Close；2 Double；4 Quadruple；6 Sextuple；8 Octuple。其它值或非有限非负整数=403。</td></tr><tr><td><code class="field-path">request.<wbr>config_<wbr>str.<wbr>angle_<wbr>speed</code></td><td>integer</td><td>仅 <code>set_swing_angle_speed</code>：摆动角速度请求。VZ SDK头声明速度常量1、12、24、36、48、60、72、84、96，min=1、max=96。</td><td><strong>赋值：</strong>设备协议若要求离散档位，应使用列出常量。；<strong>范围 / 枚举：</strong>当前JSON解析只检查键存在并toInt；没有强制[1,96]或离散档位校验，不能把SDK头常量误写成本接口403范围。</td></tr><tr><td><code class="field-path">request.<wbr>config_<wbr>str.<wbr>camera_<wbr>config.<wbr>left_<wbr>roi.<wbr>right</code></td><td>integer</td><td>左ROI四边。</td><td><strong>赋值：</strong>left_roi 与 right_roi 必须同时出现，且每个对象必须四键齐全；否则403。；<strong>范围 / 枚举：</strong>目标相机决定最终可用范围；本层无数值界限。</td></tr><tr><td><code class="field-path">request.<wbr>config_<wbr>str.<wbr>camera_<wbr>config.<wbr>left_<wbr>roi.<wbr>top</code></td><td>integer</td><td>左ROI四边。</td><td><strong>赋值：</strong>left_roi 与 right_roi 必须同时出现，且每个对象必须四键齐全；否则403。；<strong>范围 / 枚举：</strong>目标相机决定最终可用范围；本层无数值界限。</td></tr><tr><td><code class="field-path">request.<wbr>config_<wbr>str.<wbr>camera_<wbr>config.<wbr>left_<wbr>roi.<wbr>bottom</code></td><td>integer</td><td>左ROI四边。</td><td><strong>赋值：</strong>left_roi 与 right_roi 必须同时出现，且每个对象必须四键齐全；否则403。；<strong>范围 / 枚举：</strong>目标相机决定最终可用范围；本层无数值界限。</td></tr><tr><td><code class="field-path">request.<wbr>config_<wbr>str.<wbr>camera_<wbr>config.<wbr>right_<wbr>roi.<wbr>right</code></td><td>integer</td><td>右ROI四边。</td><td><strong>赋值：</strong>同左ROI；单独给一侧不会进入ROI写入分支。；<strong>范围 / 枚举：</strong>目标相机决定最终可用范围；失败501。</td></tr><tr><td><code class="field-path">request.<wbr>config_<wbr>str.<wbr>camera_<wbr>config.<wbr>right_<wbr>roi.<wbr>top</code></td><td>integer</td><td>右ROI四边。</td><td><strong>赋值：</strong>同左ROI；单独给一侧不会进入ROI写入分支。；<strong>范围 / 枚举：</strong>目标相机决定最终可用范围；失败501。</td></tr><tr><td><code class="field-path">request.<wbr>config_<wbr>str.<wbr>camera_<wbr>config.<wbr>right_<wbr>roi.<wbr>bottom</code></td><td>integer</td><td>右ROI四边。</td><td><strong>赋值：</strong>同左ROI；单独给一侧不会进入ROI写入分支。；<strong>范围 / 枚举：</strong>目标相机决定最终可用范围；失败501。</td></tr><tr><td><code class="field-path">request.<wbr>config_<wbr>str.<wbr>calib_<wbr>cfg_<wbr>para</code></td><td>object</td><td>仅 set_eye_hand_calib_cfg：标定算法配置。</td><td><strong>赋值：</strong>必填对象，以下11个子键全部必填。报错文本中的 calib_cfg_type 是服务端文案笔误，不是请求键。</td></tr><tr><td><code class="field-path">request.<wbr>config_<wbr>str.<wbr>calib_<wbr>cfg_<wbr>para.<wbr>bUseStereoCalib</code></td><td>boolean</td><td>是否使用双目标定；仅 set_eye_hand_calib_cfg。</td><td><strong>赋值：</strong>必填；使用当前SDK/标定板的已核对配置。；<strong>范围 / 枚举：</strong>服务端检查键存在后作Qt类型转换；枚举、单位与有效范围须按当前SDK确认，不提供猜测默认值。</td></tr><tr><td><code class="field-path">request.<wbr>config_<wbr>str.<wbr>calib_<wbr>cfg_<wbr>para.<wbr>eCalibType</code></td><td>integer</td><td>SDK手眼标定类型枚举；仅 set_eye_hand_calib_cfg。</td><td><strong>赋值：</strong>必填；使用当前SDK/标定板的已核对配置。；<strong>范围 / 枚举：</strong>服务端检查键存在后作Qt类型转换；枚举、单位与有效范围须按当前SDK确认，不提供猜测默认值。</td></tr><tr><td><code class="field-path">request.<wbr>config_<wbr>str.<wbr>calib_<wbr>cfg_<wbr>para.<wbr>eROrder</code></td><td>integer</td><td>SDK旋转顺序枚举；仅 set_eye_hand_calib_cfg。</td><td><strong>赋值：</strong>必填；使用当前SDK/标定板的已核对配置。；<strong>范围 / 枚举：</strong>服务端检查键存在后作Qt类型转换；枚举、单位与有效范围须按当前SDK确认，不提供猜测默认值。</td></tr><tr><td><code class="field-path">request.<wbr>config_<wbr>str.<wbr>calib_<wbr>cfg_<wbr>para.<wbr>eCalibBoardType</code></td><td>integer</td><td>SDK标定板类型枚举；仅 set_eye_hand_calib_cfg。</td><td><strong>赋值：</strong>必填；使用当前SDK/标定板的已核对配置。；<strong>范围 / 枚举：</strong>服务端检查键存在后作Qt类型转换；枚举、单位与有效范围须按当前SDK确认，不提供猜测默认值。</td></tr><tr><td><code class="field-path">request.<wbr>config_<wbr>str.<wbr>calib_<wbr>cfg_<wbr>para.<wbr>nCalibBoardLength</code></td><td>integer</td><td>标定板长度方向数量；仅 set_eye_hand_calib_cfg。</td><td><strong>赋值：</strong>必填；使用当前SDK/标定板的已核对配置。；<strong>范围 / 枚举：</strong>服务端检查键存在后作Qt类型转换；枚举、单位与有效范围须按当前SDK确认，不提供猜测默认值。</td></tr><tr><td><code class="field-path">request.<wbr>config_<wbr>str.<wbr>calib_<wbr>cfg_<wbr>para.<wbr>nCalibBoardWidth</code></td><td>integer</td><td>标定板宽度方向数量；仅 set_eye_hand_calib_cfg。</td><td><strong>赋值：</strong>必填；使用当前SDK/标定板的已核对配置。；<strong>范围 / 枚举：</strong>服务端检查键存在后作Qt类型转换；枚举、单位与有效范围须按当前SDK确认，不提供猜测默认值。</td></tr><tr><td><code class="field-path">request.<wbr>config_<wbr>str.<wbr>calib_<wbr>cfg_<wbr>para.<wbr>dCalibGridEdgeLen</code></td><td>number</td><td>标定格边长；仅 set_eye_hand_calib_cfg。</td><td><strong>赋值：</strong>必填；使用当前SDK/标定板的已核对配置。；<strong>范围 / 枚举：</strong>服务端检查键存在后作Qt类型转换；枚举、单位与有效范围须按当前SDK确认，不提供猜测默认值。</td></tr><tr><td><code class="field-path">request.<wbr>config_<wbr>str.<wbr>calib_<wbr>cfg_<wbr>para.<wbr>dCornerDetectErrThres</code></td><td>number</td><td>角点检测误差阈值；仅 set_eye_hand_calib_cfg。</td><td><strong>赋值：</strong>必填；使用当前SDK/标定板的已核对配置。；<strong>范围 / 枚举：</strong>服务端检查键存在后作Qt类型转换；枚举、单位与有效范围须按当前SDK确认，不提供猜测默认值。</td></tr><tr><td><code class="field-path">request.<wbr>config_<wbr>str.<wbr>calib_<wbr>cfg_<wbr>para.<wbr>bEnableEyeToHandCalibMatrixAdjust</code></td><td>boolean</td><td>是否启用眼在手外矩阵调整；仅 set_eye_hand_calib_cfg。</td><td><strong>赋值：</strong>必填；使用当前SDK/标定板的已核对配置。；<strong>范围 / 枚举：</strong>服务端检查键存在后作Qt类型转换；枚举、单位与有效范围须按当前SDK确认，不提供猜测默认值。</td></tr><tr><td><code class="field-path">request.<wbr>config_<wbr>str.<wbr>calib_<wbr>cfg_<wbr>para.<wbr>dEyeToHandMinCalilbErrThres</code></td><td>number</td><td>眼在手外标定最小误差阈值；Calilb为协议原拼写；仅 set_eye_hand_calib_cfg。</td><td><strong>赋值：</strong>必填；使用当前SDK/标定板的已核对配置。；<strong>范围 / 枚举：</strong>服务端检查键存在后作Qt类型转换；枚举、单位与有效范围须按当前SDK确认，不提供猜测默认值。</td></tr><tr><td><code class="field-path">request.<wbr>config_<wbr>str.<wbr>calib_<wbr>cfg_<wbr>para.<wbr>nEyeToHandMinCalibItemNum</code></td><td>integer</td><td>眼在手外标定最小样本数；仅 set_eye_hand_calib_cfg。</td><td><strong>赋值：</strong>必填；使用当前SDK/标定板的已核对配置。；<strong>范围 / 枚举：</strong>服务端检查键存在后作Qt类型转换；枚举、单位与有效范围须按当前SDK确认，不提供猜测默认值。</td></tr><tr><td><code class="field-path">request.<wbr>config_<wbr>str.<wbr>nPointNum</code></td><td>integer</td><td>仅 get_eye_hand_calib_matrix：标定样本数。</td><td><strong>赋值：</strong>必填整数且至少5；须等于pExtrinsicList与pRobotPointList的长度。；<strong>范围 / 枚举：</strong>调用方拒绝负数、非整数和溢出；服务端先toInt再转unsigned，不能依赖其处理非法负数。</td></tr><tr><td><code class="field-path">request.<wbr>config_<wbr>str.<wbr>pExtrinsicList</code></td><td>array</td><td>仅 get_eye_hand_calib_matrix：相机外参样本。</td><td><strong>赋值：</strong>必填；长度等于nPointNum，与另一列表按下标一一对应。；<strong>范围 / 枚举：</strong>每项可为6个数的数组，或含values的对象；必须来自真实采样，不能填虚构零点。</td></tr><tr><td><code class="field-path">request.<wbr>config_<wbr>str.<wbr>pExtrinsicList[].<wbr>values</code></td><td>number[6]</td><td>对象项写法中的6分量值；也支持直接用6元素数组。</td><td><strong>赋值：</strong>使用对象项时必填values，长度固定6；顺序、坐标系和单位需与标定算法一致。；<strong>范围 / 枚举：</strong>协议不声明通用位姿顺序；不要直接套机器人TCP数据。底层接受null并转0，调用方应禁止此用法。</td></tr><tr><td><code class="field-path">request.<wbr>config_<wbr>str.<wbr>pRobotPointList</code></td><td>array</td><td>仅 get_eye_hand_calib_matrix：对应机器人样本。</td><td><strong>赋值：</strong>必填；长度等于nPointNum，与另一列表按下标一一对应。；<strong>范围 / 枚举：</strong>每项可为6个数的数组，或含values的对象；必须来自真实采样，不能填虚构零点。</td></tr><tr><td><code class="field-path">request.<wbr>config_<wbr>str.<wbr>pRobotPointList[].<wbr>values</code></td><td>number[6]</td><td>对象项写法中的6分量值；也支持直接用6元素数组。</td><td><strong>赋值：</strong>使用对象项时必填values，长度固定6；顺序、坐标系和单位需与标定算法一致。；<strong>范围 / 枚举：</strong>协议不声明通用位姿顺序；不要直接套机器人TCP数据。底层接受null并转0，调用方应禁止此用法。</td></tr><tr><td><code class="field-path">request.<wbr>config_<wbr>str.<wbr>pCalibRefPointList</code></td><td>array</td><td>仅 get_eye_hand_calib_matrix：可选参考样本。</td><td><strong>赋值：</strong>可省略或null；非null时走带参考点的算法分支。；<strong>范围 / 枚举：</strong>每项可为6个数的数组，或含values的对象；必须来自真实采样，不能填虚构零点。</td></tr><tr><td><code class="field-path">request.<wbr>config_<wbr>str.<wbr>pCalibRefPointList[].<wbr>values</code></td><td>number[6]</td><td>对象项写法中的6分量值；也支持直接用6元素数组。</td><td><strong>赋值：</strong>使用对象项时必填values，长度固定6；顺序、坐标系和单位需与标定算法一致。；<strong>范围 / 枚举：</strong>协议不声明通用位姿顺序；不要直接套机器人TCP数据。底层接受null并转0，调用方应禁止此用法。</td></tr></tbody></table></div>
+<h4>JSON 响应字段</h4><div class="table-scroll fields-scroll"><table class="field-table json-field-table"><thead><tr><th>字段路径</th><th>类型</th><th>含义与填写／解析方式</th><th>有效值／限制</th></tr></thead><tbody><tr><td><code class="field-path">response.<wbr>message.<wbr>status</code></td><td>integer</td><td>内层JSON状态。</td><td><strong>范围 / 枚举：</strong>通常200；非法输入400；无设备/SDK失败500。</td></tr><tr><td><code class="field-path">response.<wbr>message.<wbr>message</code></td><td>string</td><td>内层处理文字。</td><td><strong>范围 / 枚举：</strong>可能缺失，消费者需容错。</td></tr><tr><td><code class="field-path">response.<wbr>message.<wbr>connect_<wbr>status</code></td><td>integer</td><td>仅connect_status：1已连接，0未连接。</td><td><strong>范围 / 枚举：</strong>0/1。</td></tr><tr><td><code class="field-path">response.<wbr>message.<wbr>width</code></td><td>integer</td><td>仅get_resolution成功：帧宽。</td><td><strong>范围 / 枚举：</strong>像素。</td></tr><tr><td><code class="field-path">response.<wbr>message.<wbr>height</code></td><td>integer</td><td>仅get_resolution成功：帧高。</td><td><strong>范围 / 枚举：</strong>像素。</td></tr><tr><td><code class="field-path">response.<wbr>message.<wbr>camera_<wbr>config.<wbr>exposure_<wbr>mode</code></td><td>string</td><td>连接或get_camera_config返回；<code>fixed</code>或<code>auto</code>（由SDK枚举映射）。</td><td><strong>范围 / 枚举：</strong>相机连接时才生成。</td></tr><tr><td><code class="field-path">response.<wbr>message.<wbr>camera_<wbr>config.<wbr>exposure</code></td><td>integer</td><td>SDK读取的曝光值。</td><td><strong>范围 / 枚举：</strong>本接口不规定统一单位或范围。</td></tr><tr><td><code class="field-path">response.<wbr>message.<wbr>camera_<wbr>config.<wbr>frame_<wbr>rate</code></td><td>integer</td><td>SDK读取帧率。</td><td><strong>范围 / 枚举：</strong>单位通常fps但此接口未明确声明。</td></tr><tr><td><code class="field-path">response.<wbr>message.<wbr>camera_<wbr>config.<wbr>left_<wbr>gain</code></td><td>integer</td><td>左相机SDK增益。</td><td><strong>范围 / 枚举：</strong>取值范围使用目标设备配置约定。</td></tr><tr><td><code class="field-path">response.<wbr>message.<wbr>camera_<wbr>config.<wbr>right_<wbr>gain</code></td><td>integer</td><td>右相机SDK增益。</td><td><strong>范围 / 枚举：</strong>取值范围使用目标设备配置约定。</td></tr><tr><td><code class="field-path">response.<wbr>message.<wbr>camera_<wbr>config.<wbr>left_<wbr>roi.<wbr>left</code></td><td>number</td><td>ROI left_roi 的 left 边界。</td><td><strong>范围 / 枚举：</strong>像素与坐标约定使用目标相机配置。</td></tr><tr><td><code class="field-path">response.<wbr>message.<wbr>camera_<wbr>config.<wbr>left_<wbr>roi.<wbr>right</code></td><td>number</td><td>ROI left_roi 的 right 边界。</td><td><strong>范围 / 枚举：</strong>像素与坐标约定使用目标相机配置。</td></tr><tr><td><code class="field-path">response.<wbr>message.<wbr>camera_<wbr>config.<wbr>left_<wbr>roi.<wbr>top</code></td><td>number</td><td>ROI left_roi 的 top 边界。</td><td><strong>范围 / 枚举：</strong>像素与坐标约定使用目标相机配置。</td></tr><tr><td><code class="field-path">response.<wbr>message.<wbr>camera_<wbr>config.<wbr>left_<wbr>roi.<wbr>bottom</code></td><td>number</td><td>ROI left_roi 的 bottom 边界。</td><td><strong>范围 / 枚举：</strong>像素与坐标约定使用目标相机配置。</td></tr><tr><td><code class="field-path">response.<wbr>message.<wbr>camera_<wbr>config.<wbr>right_<wbr>roi.<wbr>left</code></td><td>number</td><td>ROI right_roi 的 left 边界。</td><td><strong>范围 / 枚举：</strong>像素与坐标约定使用目标相机配置。</td></tr><tr><td><code class="field-path">response.<wbr>message.<wbr>camera_<wbr>config.<wbr>right_<wbr>roi.<wbr>right</code></td><td>number</td><td>ROI right_roi 的 right 边界。</td><td><strong>范围 / 枚举：</strong>像素与坐标约定使用目标相机配置。</td></tr><tr><td><code class="field-path">response.<wbr>message.<wbr>camera_<wbr>config.<wbr>right_<wbr>roi.<wbr>top</code></td><td>number</td><td>ROI right_roi 的 top 边界。</td><td><strong>范围 / 枚举：</strong>像素与坐标约定使用目标相机配置。</td></tr><tr><td><code class="field-path">response.<wbr>message.<wbr>camera_<wbr>config.<wbr>right_<wbr>roi.<wbr>bottom</code></td><td>number</td><td>ROI right_roi 的 bottom 边界。</td><td><strong>范围 / 枚举：</strong>像素与坐标约定使用目标相机配置。</td></tr><tr><td><code class="field-path">response.<wbr>message.<wbr>laser_<wbr>config.<wbr>laser_<wbr>off</code></td><td>boolean</td><td>SDK读取的激光灯关闭状态；true=关闭。</td><td><strong>范围 / 枚举：</strong>连接时才生成。</td></tr><tr><td><code class="field-path">response.<wbr>message.<wbr>laser_<wbr>config.<wbr>laser_<wbr>power_<wbr>level</code></td><td>integer</td><td>SDK读取激光功率等级。</td><td><strong>范围 / 枚举：</strong>等级枚举及范围以目标设备协议为准。</td></tr><tr><td><code class="field-path">response.<wbr>message.<wbr>laser_<wbr>config.<wbr>laser_<wbr>power_<wbr>range.<wbr>min</code></td><td>integer</td><td>SDK返回的激光功率等级下界。</td><td><strong>范围 / 枚举：</strong>单位未声明。</td></tr><tr><td><code class="field-path">response.<wbr>message.<wbr>laser_<wbr>config.<wbr>laser_<wbr>power_<wbr>range.<wbr>max</code></td><td>integer</td><td>SDK返回的激光功率等级上界。</td><td><strong>范围 / 枚举：</strong>单位未声明。</td></tr><tr><td><code class="field-path">response.<wbr>message.<wbr>laser_<wbr>status</code></td><td>boolean</td><td>仅laser_status：SDK激光灯使能状态。</td><td><strong>范围 / 枚举：</strong>true/false。</td></tr><tr><td><code class="field-path">response.<wbr>message.<wbr>error_<wbr>type</code></td><td>integer</td><td>DriverError：1001未连接、1002参数非法、2001SDK失败、3001未知命令。</td><td><strong>范围 / 枚举：</strong>status与此字段必须共同解释。</td></tr><tr><td><code class="field-path">response.<wbr>message.<wbr>error_<wbr>type_<wbr>name</code></td><td>string</td><td>DriverError 名称。</td><td><strong>范围 / 枚举：</strong>NotConnected/InvalidParam/SdkFailure/UnknownCommand 等。</td></tr><tr><td><code class="field-path">response.<wbr>message.<wbr>ranges.<wbr>&lt;frame_<wbr>rate|expose|gain|laser_<wbr>light|frame_<wbr>rate_<wbr>without_<wbr>color_<wbr>data|frame_<wbr>rate_<wbr>with_<wbr>color_<wbr>data|strobe_<wbr>time_<wbr>ratio&gt;.<wbr>min/max</code></td><td>integer</td><td><code>get_param_range</code> 返回的当前SDK参数上下界。</td><td><strong>范围 / 枚举：</strong>每一项由部署相机SDK给出。</td></tr></tbody></table></div>
+<p class="module-link">完整流程：<a href="#examples-camera">对应模块示例</a></p>
 <h4>JSON 缺失、空值与解析</h4><p>空串、null、数组或语法错误返回内层400/Invalid JSON。缺command_type时按空字符串处理，在已连接VZ上返回未知命令400。缺camera_configuration/laser_configuration内部对象返回403。ROI失败可能仍返回status200，必须同时检查error_type/message并回读camera_config。set_rgb_trigger_mode和set_anti_reflect_gain_type校验本页列出的枚举；摆动扫描模式、方向和角速度仅作数值转换后传给SDK，SDK枚举不等于服务端校验范围。</p>
 <p>填写方式：先按command_type选择分支，只提供该分支读取的字段；不是把所有配置键拼在同一请求中。config_str始终是JSON字符串。set_eye_hand_calib_cfg与get_eye_hand_calib_matrix虽共用配置接口，但标定输入结构不同；后者是计算，不是无参数查询。部分摆动命令缺参后仍可能调用SDK，不得发送缺参请求测试。</p>
-<h4>响应示例</h4><div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-json">{
-  &quot;message&quot;: &quot;{\&quot;message\&quot;:\&quot;Device not connected\&quot;,\&quot;status\&quot;:500}&quot;
-}</code></pre></div>
-<h4>返回数据与成功判断</h4><p>必须解析 response.message JSON；服务层没有独立status字段。2026-10-23 首次 connect_status 返回500 / Device not connected，只表示当时未连接，不代表不能连接。随后本机 Python SDK 按发现结果发送一次 connect，返回200，再次查询 connect_status=1；已验证连接及参数回读，未验证采集或扫描。下方500响应示例保留为连接前的真实错误场景。</p>
+<h4>返回数据与成功判断</h4><p>先解析response.message，再检查内层status和error_type，并按该命令检查返回字段。设置类命令应独立调用对应getter，核对目标值和实际值；200表示请求处理结果，实际配置以回读为准。外层只有message，不存在response.status。完整扫描还需等待采集结束通知，并核对下载点数。</p>
 <h4>状态码 / 枚举</h4><div class="table-scroll"><table><thead><tr><th>数值 / 字段</th><th>业务含义</th><th>处理</th></tr></thead><tbody><tr><td><code>200</code></td><td>配置分支给出的成功；ROI路径存在后续无条件覆盖status=200的实现缺陷。</td><td>ROI写入必须同时检查 error_type 是否缺失，并核对返回ROI/后续get_camera_config。</td></tr><tr><td><code>400</code></td><td>未知 command_type。</td><td>严格使用列表中的小写字符串。</td></tr><tr><td><code>403</code></td><td>必填参数缺失或显式范围校验失败。</td><td>修正请求，不自动重试。</td></tr><tr><td><code>500 / 501 / SDK返回值</code></td><td>未连接/SDK失败；ROI SDK错误固定501，laser配置SDK错误直接透传SDK值。</td><td>保留 error_type/message；设备实际状态未知时重新查询。</td></tr></tbody></table></div>
 </article><article class="endpoint searchable" id="camera_control" data-category="camera">
 <div class="endpoint-heading"><span class="method">SERVICE</span><h3>控制3D相机采集</h3></div>
@@ -3850,11 +4581,99 @@ string message</code></pre></div></details>
 <h4>响应字段</h4><div class="table-scroll fields-scroll"><table class="field-table"><thead><tr><th>字段</th><th>类型</th><th>含义与解析方式</th></tr></thead><tbody>
 <tr><td><code class="field-path">message</code></td><td>string</td><td>解析内层JSON；VZ 控制当前没有参数化写成员，所有命令仅 command_type。</td></tr>
 </tbody></table></div><p class="muted">嵌套类型可跳转到<a href="#data-types">数据类型与状态码</a>中的对应定义。</p>
+<section class="verified-exchanges"><h4>本机实测：请求数据、响应与回读</h4>
+<p>2026-11-05本机Python SDK完整扫描的真实控制响应。control_str为JSON字符串；下方发送对象应先json.dumps，返回对象由json.loads(response.message)得到。先完成配置、提前订阅状态，再启动采集。对应 <a href="#camera_config">实际参数</a> 和 <a href="#camera_status">采集状态消息</a>。</p>
+<details open><summary>2026-11-05：启动扫描、等待完成、停止并下载（成功）</summary>
+<p>已使用配置实例中的曝光600、帧率设置200、功率3、扫描端点0～60、速度50。收到start_capture响应后继续等待状态Topic的capture事件1→0；本次结束消息报告912214个点，才开始读取点云。下面的两条服务请求中间包含约5秒的采集等待。</p>
+<p>对应脚本：<a href="../examples/python/camera/camera_scan_demo.py">examples/python/camera/camera_scan_demo.py</a></p>
+<h5>① 请求启动；200只表示此次控制请求成功返回</h5>
+<p>发送：<code>control_str</code> 内的 JSON 对象</p><div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-json">{
+  &quot;command_type&quot;: &quot;start_capture&quot;
+}</code></pre></div>
+<p>收到：<code>json.loads(response.message)</code> 的完整结果</p><div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-json">{
+  &quot;message&quot;: &quot;Capture started&quot;,
+  &quot;status&quot;: 200
+}</code></pre></div>
+<h5>② 收到结束事件和有效点数后，发送停止请求</h5>
+<p>发送：<code>control_str</code> 内的 JSON 对象</p><div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-json">{
+  &quot;command_type&quot;: &quot;stop_capture&quot;
+}</code></pre></div>
+<p>收到：<code>json.loads(response.message)</code> 的完整结果</p><div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-json">{
+  &quot;message&quot;: &quot;Capture stopped&quot;,
+  &quot;status&quot;: 200
+}</code></pre></div>
+<h5>本机脚本结果摘要（不是 ROS 响应字段）</h5><div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-json">{
+  &quot;status&quot;: &quot;passed&quot;,
+  &quot;points&quot;: 912214,
+  &quot;blocks&quot;: 823,
+  &quot;first_points&quot;: [
+    {
+      &quot;x&quot;: -143.86434936523438,
+      &quot;y&quot;: -346.06683349609375,
+      &quot;z&quot;: 480.9771728515625,
+      &quot;w&quot;: 214.0,
+      &quot;p&quot;: 0.0,
+      &quot;r&quot;: 0.0
+    },
+    {
+      &quot;x&quot;: -143.91041564941406,
+      &quot;y&quot;: -345.8050842285156,
+      &quot;z&quot;: 481.12640380859375,
+      &quot;w&quot;: 205.0,
+      &quot;p&quot;: 0.0,
+      &quot;r&quot;: 0.0
+    },
+    {
+      &quot;x&quot;: -143.9357147216797,
+      &quot;y&quot;: -345.4794006347656,
+      &quot;z&quot;: 481.1868591308594,
+      &quot;w&quot;: 201.0,
+      &quot;p&quot;: 0.0,
+      &quot;r&quot;: 0.0
+    }
+  ]
+}</code></pre></div>
+<p><strong>本次结论：</strong>点云通过Python SDK download_cloud读取，实际Action为 /at/camera_node/get_all_point_cloud，json_data内容为 {&quot;frequency&quot;:30}。下载823块、累计912214点，与本次结束通知一致；全部清理通过后脚本才写status=passed。以下前三个点是本次下载结果摘录，w/p/r存放RGB，不是欧拉角；坐标系和单位未由接口声明。该本机下载结果不等于上层HTTP world.pcd，也没有记录完整原始Action Result供展示。</p></details>
+<details><summary>2026-11-05：清理采集、关闭激光与保护盖</summary>
+<p>完整脚本在finally中逐项清理。一项失败仍继续后续清理，失败时不会生成passed结果。下方为控制接口响应；disable_swing_motor、C版手动灯关闭及独立状态回读见配置接口实例。</p>
+<p>对应脚本：<a href="../examples/python/camera/camera_scan_demo.py">examples/python/camera/camera_scan_demo.py</a></p>
+<h5>① 停止点云采集</h5>
+<p>发送：<code>control_str</code> 内的 JSON 对象</p><div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-json">{
+  &quot;command_type&quot;: &quot;stop_capture&quot;
+}</code></pre></div>
+<p>收到：<code>json.loads(response.message)</code> 的完整结果</p><div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-json">{
+  &quot;message&quot;: &quot;Capture stopped&quot;,
+  &quot;status&quot;: 200
+}</code></pre></div>
+<h5>② 停止图像采集</h5>
+<p>发送：<code>control_str</code> 内的 JSON 对象</p><div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-json">{
+  &quot;command_type&quot;: &quot;stop_capture_image&quot;
+}</code></pre></div>
+<p>收到：<code>json.loads(response.message)</code> 的完整结果</p><div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-json">{
+  &quot;message&quot;: &quot;Image capture stopped&quot;,
+  &quot;status&quot;: 200
+}</code></pre></div>
+<h5>③ 关闭激光</h5>
+<p>发送：<code>control_str</code> 内的 JSON 对象</p><div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-json">{
+  &quot;command_type&quot;: &quot;close_laser&quot;
+}</code></pre></div>
+<p>收到：<code>json.loads(response.message)</code> 的完整结果</p><div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-json">{
+  &quot;message&quot;: &quot;Laser closed&quot;,
+  &quot;status&quot;: 200
+}</code></pre></div>
+<h5>④ 关闭保护盖</h5>
+<p>发送：<code>control_str</code> 内的 JSON 对象</p><div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-json">{
+  &quot;command_type&quot;: &quot;close_cover&quot;
+}</code></pre></div>
+<p>收到：<code>json.loads(response.message)</code> 的完整结果</p><div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-json">{
+  &quot;message&quot;: &quot;Cover closed&quot;,
+  &quot;status&quot;: 200
+}</code></pre></div>
+<p><strong>本次结论：</strong>控制请求均status=200；另经配置getter确认电机和两种激光状态关闭。保护盖没有位置传感器回读记录，仅确认close_cover成功响应。</p></details>
+</section>
 <h4>JSON 请求字段</h4><div class="table-scroll fields-scroll"><table class="field-table json-field-table"><thead><tr><th>字段路径</th><th>类型</th><th>含义与填写／解析方式</th><th>有效值／限制</th></tr></thead><tbody><tr><td><code class="field-path">request.<wbr>control_<wbr>str.<wbr>command_<wbr>type</code></td><td>string</td><td>严格大小写控制命令。</td><td><strong>赋值：</strong>必填；当前全部值：start_capture、stop_capture、open_laser、close_laser、start_capture_image、stop_capture_image、open_cover、close_cover。；<strong>范围 / 枚举：</strong>CameraNode直接处理start_capture/stop_capture，不转给controlJson；VZ controlJson仅接受open_laser、close_laser、start_capture_image、stop_capture_image、open_cover、close_cover。大小写敏感，未知命令内层400。</td></tr></tbody></table></div>
 <h4>JSON 响应字段</h4><div class="table-scroll fields-scroll"><table class="field-table json-field-table"><thead><tr><th>字段路径</th><th>类型</th><th>含义与填写／解析方式</th><th>有效值／限制</th></tr></thead><tbody><tr><td><code class="field-path">response.<wbr>message.<wbr>status</code></td><td>integer</td><td>内层控制结果。</td><td><strong>范围 / 枚举：</strong>200成功；400未知；500未连接或SDK失败。</td></tr><tr><td><code class="field-path">response.<wbr>message.<wbr>message</code></td><td>JSON value</td><td>string，具体处理文本。</td><td>—</td></tr><tr><td><code class="field-path">response.<wbr>message.<wbr>error_<wbr>type</code></td><td>integer</td><td>出错时DriverError数值。</td><td><strong>范围 / 枚举：</strong>1001/2001/3001。</td></tr></tbody></table></div>
-<p class="module-link">完整流程：<a href="#examples-camera">对应模块示例</a></p><h4>请求数据</h4><div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-json">{
-  &quot;control_str&quot;: &quot;{\&quot;command_type\&quot;:\&quot;start_capture\&quot;}&quot;
-}</code></pre></div>
+<p class="module-link">完整流程：<a href="#examples-camera">对应模块示例</a></p>
 <h4>开始点云采集请求（单独选择；不是依次执行的流程）</h4><div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-json">{
   &quot;control_str&quot;: &quot;{\&quot;command_type\&quot;:\&quot;start_capture\&quot;}&quot;
 }</code></pre></div>
@@ -3880,7 +4699,7 @@ string message</code></pre></div></details>
   &quot;control_str&quot;: &quot;{\&quot;command_type\&quot;:\&quot;close_cover\&quot;}&quot;
 }</code></pre></div>
 <h4>JSON 缺失、空值与解析</h4><p>control_str必须是JSON对象序列化后的字符串。当前8个控制命令只读取command_type，没有额外speed、exposure、guid或capture_time输入；这些不能凭空添加。曝光/ROI/激光功率/摆动参数属于config接口。下列请求相互独立，禁止把全部示例当作连续执行脚本；开启激光、开盖或采集须单独满足现场安全条件。</p>
-<h4>返回数据与成功判断</h4><p>start_capture的200仅表示 driver startCapture 返回true；点云另从 camera_points_raw Topic 接收。 目标服务必须已部署并可发现。</p>
+<h4>返回数据与成功判断</h4><p>start_capture异步启动，内层status=200不等于扫描完成。必须提前订阅 /at/camera_node/status，等待本次capture状态1→0，并检查结束point_cloud_count&gt;0；独占相机时，再下载并核对总点数。本次实际得到912214个点、823个数据块，最终清理通过。当前VZ原始点云Topic未启用发布，不以points_raw作为完成依据。完整流程见camera_scan_demo.py。</p>
 <h4>状态码 / 枚举</h4><div class="table-scroll"><table><thead><tr><th>数值 / 字段</th><th>业务含义</th><th>处理</th></tr></thead><tbody><tr><td><code>200</code></td><td>服务端已完成当前请求处理；对控制接口仍须结合 result/后续状态判断设备状态。</td><td>先检查 status，再按本接口的 result/data/message 解释。</td></tr><tr><td><code>400</code></td><td>服务拒绝、前置状态不满足或请求值不可接受。</td><td>读取 message；不要自动重试有副作用的控制。</td></tr><tr><td><code>500</code></td><td>异常或本接口定义的运行时不可用。</td><td>保留 message；状态未知时查询状态/等待人工处置。</td></tr></tbody></table></div>
 </article><article class="endpoint searchable" id="camera_points_raw" data-category="camera">
 <div class="endpoint-heading"><span class="method">TOPIC</span><h3>原始点云</h3></div>
@@ -3913,15 +4732,37 @@ string data
 </code></pre></div></details>
 <div class="endpoint-summary"><p>订阅相机状态消息。</p></div>
 <p class="muted public-data-link">公共数据 / 状态：<a href="#type-cloud">见数据类型与状态码</a></p>
-
+<h4>调用条件</h4><p>在调用 /at/camera_node/control 的start_capture之前订阅；本次测试由单个客户端独占相机。</p>
 <h4>消息字段</h4><div class="table-scroll fields-scroll"><table class="field-table"><thead><tr><th>字段</th><th>类型</th><th>含义与解析方式</th></tr></thead><tbody>
 <tr><td><code class="field-path">data</code></td><td>string</td><td>当前VZ实际主动发布的是捕获状态JSON；CameraNode也允许驱动任意status JSON原样透传，不能用文档注释虚构device_connected等必有事件。</td></tr>
 </tbody></table></div><p class="muted">嵌套类型可跳转到<a href="#data-types">数据类型与状态码</a>中的对应定义。</p>
-<h4>JSON 消息字段</h4><div class="table-scroll fields-scroll"><table class="field-table json-field-table"><thead><tr><th>字段路径</th><th>类型</th><th>含义与填写／解析方式</th><th>有效值／限制</th></tr></thead><tbody><tr><td><code class="field-path">message.<wbr>data.<wbr>event_<wbr>type</code></td><td>string</td><td>当前capture发布路径固定 <code>capture</code>。</td><td><strong>范围 / 枚举：</strong>其它driver直传JSON可不同。</td></tr><tr><td><code class="field-path">message.<wbr>data.<wbr>message</code></td><td>string</td><td>当前值为 Capture started、Failed to begin capture、Capture stopped。</td><td><strong>范围 / 枚举：</strong>精确文本仅当前VZ路径。</td></tr><tr><td><code class="field-path">message.<wbr>data.<wbr>status_<wbr>code</code></td><td>JSON value</td><td>number。</td><td>—</td></tr><tr><td><code class="field-path">message.<wbr>data.<wbr>driver_<wbr>type</code></td><td>JSON value</td><td>string，例如节点参数 virtual/vznl；不是外部稳定枚举承诺。</td><td>—</td></tr><tr><td><code class="field-path">message.<wbr>data.<wbr>device_<wbr>id</code></td><td>JSON value</td><td>string，节点参数。</td><td>—</td></tr><tr><td><code class="field-path">message.<wbr>data.<wbr>timestamp</code></td><td>string</td><td>VZ capture状态发布时间，格式 <code>yyyy-MM-dd hh:mm:ss.zzz</code>。</td><td><strong>范围 / 枚举：</strong>不是Unix epoch。</td></tr><tr><td><code class="field-path">message.<wbr>data.<wbr>status</code></td><td>integer</td><td>capture状态：1开始，0停止或开始失败。</td><td><strong>范围 / 枚举：</strong>0需结合message区分失败/正常停止。</td></tr><tr><td><code class="field-path">message.<wbr>data.<wbr>point_<wbr>cloud_<wbr>count</code></td><td>integer</td><td>仅正常Capture stopped发布；为累计点数（变量名不是云块数）。</td><td><strong>范围 / 枚举：</strong>开始/失败消息缺失该键。</td></tr></tbody></table></div>
+<section class="verified-exchanges"><h4>本机实测：收到的消息</h4>
+<p>实际ROS Topic名称为 /at/camera_node/status，类型std_msgs/msg/String。它没有请求和服务响应；订阅后对message.data执行json.loads。下面是2026-11-05本次扫描实际收到的两条完整JSON消息，时间戳保留服务端原值。</p>
+<details open><summary>2026-11-05：采集开始 → 采集结束，912214个点</summary>
+<p>必须在启动采集前订阅。这里只展示capture事件；status是此事件中的状态字段，不是Service业务码。开始消息没有point_cloud_count，结束消息中的point_cloud_count是点的总数，不是数据块数。</p>
+<p>对应脚本：<a href="../examples/python/camera/camera_scan_demo.py">examples/python/camera/camera_scan_demo.py</a></p>
+<h5>① 开始通知：status=1</h5>
+<p>收到：<code>json.loads(message.data)</code> 的完整消息</p><div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-json">{
+  &quot;event_type&quot;: &quot;capture&quot;,
+  &quot;message&quot;: &quot;Capture started&quot;,
+  &quot;status&quot;: 1,
+  &quot;timestamp&quot;: &quot;2026-11-05 19:55:47.745&quot;
+}</code></pre></div>
+<h5>② 结束通知：status=0，累计点数912214</h5>
+<p>收到：<code>json.loads(message.data)</code> 的完整消息</p><div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-json">{
+  &quot;event_type&quot;: &quot;capture&quot;,
+  &quot;message&quot;: &quot;Capture stopped&quot;,
+  &quot;point_cloud_count&quot;: 912214,
+  &quot;status&quot;: 0,
+  &quot;timestamp&quot;: &quot;2026-11-05 19:55:52.676&quot;
+}</code></pre></div>
+<p><strong>本次结论：</strong>本次按顺序收到1→0，结束点数912214&gt;0；随后下载得到同样点数，共823块。只收到status=0不能单独证明本次扫描成功。该Topic未提供共同采集ID，需要独占相机，避免混入其他客户端事件。</p></details>
+</section>
+<h4>JSON 消息字段</h4><div class="table-scroll fields-scroll"><table class="field-table json-field-table"><thead><tr><th>字段路径</th><th>类型</th><th>含义与填写／解析方式</th><th>有效值／限制</th></tr></thead><tbody><tr><td><code class="field-path">message.<wbr>data.<wbr>event_<wbr>type</code></td><td>string</td><td>当前capture发布路径固定 <code>capture</code>。</td><td><strong>范围 / 枚举：</strong>其它driver直传JSON可不同。</td></tr><tr><td><code class="field-path">message.<wbr>data.<wbr>message</code></td><td>string</td><td>当前值为 Capture started、Failed to begin capture、Capture stopped。</td><td><strong>范围 / 枚举：</strong>精确文本仅当前VZ路径。</td></tr><tr><td><code class="field-path">message.<wbr>data.<wbr>status_<wbr>code</code></td><td>JSON value</td><td>其他节点发布路径可能携带；本次VZ capture消息没有此字段，不得作为必填字段。</td><td><strong>范围 / 枚举：</strong>仅在实际消息含该字段时解析；本次捕获状态使用status。</td></tr><tr><td><code class="field-path">message.<wbr>data.<wbr>driver_<wbr>type</code></td><td>JSON value</td><td>其他节点发布路径可能携带；本次VZ capture消息没有此字段，不得作为必填字段。</td><td><strong>范围 / 枚举：</strong>仅在实际消息含该字段时解析；本次捕获状态使用status。</td></tr><tr><td><code class="field-path">message.<wbr>data.<wbr>device_<wbr>id</code></td><td>JSON value</td><td>其他节点发布路径可能携带；本次VZ capture消息没有此字段，不得作为必填字段。</td><td><strong>范围 / 枚举：</strong>仅在实际消息含该字段时解析；本次捕获状态使用status。</td></tr><tr><td><code class="field-path">message.<wbr>data.<wbr>timestamp</code></td><td>string</td><td>VZ capture状态发布时间，格式 <code>yyyy-MM-dd hh:mm:ss.zzz</code>。</td><td><strong>范围 / 枚举：</strong>不是Unix epoch。</td></tr><tr><td><code class="field-path">message.<wbr>data.<wbr>status</code></td><td>integer</td><td>当前capture事件的状态：1开始，0停止或启动失败；不是服务返回的200/400/500。</td><td><strong>范围 / 枚举：</strong>0需结合message区分失败/正常停止。</td></tr><tr><td><code class="field-path">message.<wbr>data.<wbr>point_<wbr>cloud_<wbr>count</code></td><td>integer</td><td>仅正常Capture stopped发布；为累计点数（变量名不是云块数）。</td><td><strong>范围 / 枚举：</strong>开始/失败消息缺失该键。</td></tr></tbody></table></div>
 <p class="module-link">完整流程：<a href="#examples-camera">对应模块示例</a></p>
 <h4>JSON 缺失、空值与解析</h4><p>设备底层工作状态变化不会单独触发本Topic发布；以实际收到的消息为准。</p>
-<h4>返回数据与成功判断</h4><p>Topic，无请求/响应。</p>
-<h4>状态码 / 枚举</h4><div class="table-scroll"><table><thead><tr><th>数值 / 字段</th><th>业务含义</th><th>处理</th></tr></thead><tbody><tr><td><code>200</code></td><td>服务端已完成当前请求处理；对控制接口仍须结合 result/后续状态判断设备状态。</td><td>先检查 status，再按本接口的 result/data/message 解释。</td></tr><tr><td><code>400</code></td><td>服务拒绝、前置状态不满足或请求值不可接受。</td><td>读取 message；不要自动重试有副作用的控制。</td></tr><tr><td><code>500</code></td><td>异常或本接口定义的运行时不可用。</td><td>保留 message；状态未知时查询状态/等待人工处置。</td></tr></tbody></table></div>
+<h4>返回数据与成功判断</h4><p>Topic，无请求/响应。对当前capture事件判断status=1开始、status=0结束或开始失败，必须结合message、前序开始事件和point_cloud_count。实测Capture stopped中的912214为总点数，下载块数823由Action统计，不是该Topic字段。</p>
+<h4>状态码 / 枚举</h4><div class="table-scroll"><table><thead><tr><th>数值 / 字段</th><th>业务含义</th><th>处理</th></tr></thead><tbody><tr><td><code>capture：status=1</code></td><td>采集开始通知。</td><td>记录本次开始，继续等待结束。开始消息没有点数。</td></tr><tr><td><code>capture：status=0</code></td><td>采集停止或启动失败，不是独立成功标志。</td><td>结合message判断；已收到开始且point_cloud_count大于0后才下载核对。</td></tr><tr><td><code>point_cloud_count=912214（本次）</code></td><td>累计点数，不是点云块数。</td><td>与实际下载点数比较；不要硬编码这个数量作为通用成功条件。</td></tr></tbody></table></div>
 </article><article class="endpoint searchable" id="camera_downsample_set" data-category="camera">
 <div class="endpoint-heading"><span class="method">SERVICE</span><h3>设置扫描点云降采样</h3></div>
 <p class="endpoint-name">/at/camera_node/set_point_cloud_downsample</p><p class="muted">weld_interfaces/srv/ATFloat</p>
@@ -3990,17 +4831,33 @@ string message
 
 string data
 </code></pre></div></details>
-<div class="endpoint-summary"><p>接收相机搜索结果，获取设备guid。</p></div>
+<div class="endpoint-summary"><p>订阅 <code>/at/camera_node/sensor_search_result</code>，接收搜索发现的设备列表，取得连接所需的 <code>guid</code>。</p></div>
 <p class="muted public-data-link">公共数据 / 状态：<a href="#type-cloud">见数据类型与状态码</a></p>
-<h4>调用条件</h4><p>先开启相机搜索。</p>
+<h4>调用条件</h4><p>先订阅本 Topic，再调用 <code>/at/camera_node/search</code> 并发送 <code>enable=true</code>，等待异步消息。</p>
 <h4>消息字段</h4><div class="table-scroll fields-scroll"><table class="field-table"><thead><tr><th>字段</th><th>类型</th><th>含义与解析方式</th></tr></thead><tbody>
-<tr><td><code class="field-path">data</code></td><td>string</td><td>返回JSON数组，每项guid为设备标识，连接时原样填写connect.config_str.guid。</td></tr>
+<tr><td><code class="field-path">data</code></td><td>string</td><td>JSON 数组字符串；使用 json.loads(message.data) 得到设备列表。连接时将目标设备的 guid 原样填入 config_str JSON 对象的 guid 字段。</td></tr>
 </tbody></table></div><p class="muted">嵌套类型可跳转到<a href="#data-types">数据类型与状态码</a>中的对应定义。</p>
 <h4>JSON 消息字段</h4><div class="table-scroll fields-scroll"><table class="field-table json-field-table"><thead><tr><th>字段路径</th><th>类型</th><th>含义与填写／解析方式</th><th>有效值／限制</th></tr></thead><tbody><tr><td><code class="field-path">message.<wbr>data</code></td><td>JSON string</td><td>先解析为数组。</td><td><strong>赋值：</strong>订阅只读。；<strong>范围 / 枚举：</strong>搜索结果为空时不发布数组。</td></tr><tr><td><code class="field-path">message.<wbr>data[].<wbr>driver_<wbr>type</code></td><td>string</td><td>固定 <code>vznl</code>。</td><td><strong>范围 / 枚举：</strong>当前VZ实现。</td></tr><tr><td><code class="field-path">message.<wbr>data[].<wbr>device_<wbr>type</code></td><td>integer</td><td>VZ SDK设备类型原始枚举值。</td><td><strong>范围 / 枚举：</strong>用device_type_name显示；不在接口层硬编码数值。</td></tr><tr><td><code class="field-path">message.<wbr>data[].<wbr>device_<wbr>type_<wbr>name</code></td><td>string</td><td>当前映射：EyeCB、LaserEye、SmartEye、LaserRobotEye、SmartRobotEye、Unknown。</td><td><strong>范围 / 枚举：</strong>仅这些严格大小写字符串。</td></tr><tr><td><code class="field-path">message.<wbr>data[].<wbr>device_<wbr>name/server_<wbr>ip/mac/guid/device_<wbr>id/desc</code></td><td>string</td><td>VZ SVzNLEyeCBInfo 原样安全字符串；guid用于connect。</td><td><strong>赋值：</strong>只读；将guid原样填给connect。；<strong>范围 / 枚举：</strong>不要用server_ip或device_id替换guid。</td></tr><tr><td><code class="field-path">message.<wbr>data[].<wbr>valid</code></td><td>boolean</td><td>SDK bValidDevice==VzTrue。</td><td><strong>范围 / 枚举：</strong>false条目仍会序列化；connect循环会跳过并尝试网络配置，不等于可连。</td></tr></tbody></table></div>
 <p class="module-link">完整流程：<a href="#examples-camera">对应模块示例</a></p>
-<h4>JSON 缺失、空值与解析</h4><p>搜索线程仅在发现数组非空时回调一次并自动关闭搜索；没有设备不会发布空数组。</p>
-<h4>返回数据与成功判断</h4><p>Topic，无请求/响应；camera_search true仅开启发现，不保证立即有一条消息。</p>
-<h4>状态码 / 枚举</h4><div class="table-scroll"><table><thead><tr><th>数值 / 字段</th><th>业务含义</th><th>处理</th></tr></thead><tbody><tr><td><code>200</code></td><td>服务端已完成当前请求处理；对控制接口仍须结合 result/后续状态判断设备状态。</td><td>先检查 status，再按本接口的 result/data/message 解释。</td></tr><tr><td><code>400</code></td><td>服务拒绝、前置状态不满足或请求值不可接受。</td><td>读取 message；不要自动重试有副作用的控制。</td></tr><tr><td><code>500</code></td><td>异常或本接口定义的运行时不可用。</td><td>保留 message；状态未知时查询状态/等待人工处置。</td></tr></tbody></table></div>
+<h4>实测消息示例（2026-11-02）：data 为 JSON 字符串</h4><div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-json">{
+  &quot;data&quot;: &quot;[{\&quot;desc\&quot;:\&quot;BeiJing Vizum Technology\&quot;,\&quot;device_id\&quot;:\&quot;ID019319\&quot;,\&quot;device_name\&quot;:\&quot;Vizum Laser Robot Eye\&quot;,\&quot;device_type\&quot;:4,\&quot;device_type_name\&quot;:\&quot;LaserRobotEye\&quot;,\&quot;driver_type\&quot;:\&quot;vznl\&quot;,\&quot;guid\&quot;:\&quot;a397a255-53be-41fc-996b-521413e9e22d\&quot;,\&quot;mac\&quot;:\&quot;70:b3:d5:f3:93:19\&quot;,\&quot;server_ip\&quot;:\&quot;192.168.1.20\&quot;,\&quot;valid\&quot;:true}]&quot;
+}</code></pre></div>
+<h4>解析 message.data 后的设备数组：与 camera_search.py 打印结果对应</h4><div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-json">[
+  {
+    &quot;desc&quot;: &quot;BeiJing Vizum Technology&quot;,
+    &quot;device_id&quot;: &quot;ID019319&quot;,
+    &quot;device_name&quot;: &quot;Vizum Laser Robot Eye&quot;,
+    &quot;device_type&quot;: 4,
+    &quot;device_type_name&quot;: &quot;LaserRobotEye&quot;,
+    &quot;driver_type&quot;: &quot;vznl&quot;,
+    &quot;guid&quot;: &quot;a397a255-53be-41fc-996b-521413e9e22d&quot;,
+    &quot;mac&quot;: &quot;70:b3:d5:f3:93:19&quot;,
+    &quot;server_ip&quot;: &quot;192.168.1.20&quot;,
+    &quot;valid&quot;: true
+  }
+]</code></pre></div>
+<h4>JSON 缺失、空值与解析</h4><p>收到消息后用 <code>devices = json.loads(message.data)</code> 解析；<code>len(devices)</code> 才是这条消息中的设备数量。本次数组含 1 台设备。JSON 解析失败应保留原文。当前搜索实现没有设备时不发布空数组，因此未收到消息不能直接判定没有设备。</p>
+<h4>返回数据与成功判断</h4><p class="bullet">• 这是 Topic 消息，不是搜索服务的返回对象。<code>std_msgs/msg/String</code> 只有 <code>data</code> 字段，没有 <code>status</code>、<code>result</code> 或 <code>message</code> 字段，也不使用 200/400/500 服务状态码。</p><p class="bullet">• 本次实测设备为 Vizum Laser Robot Eye，设备 IP 为 <code>192.168.1.20</code>；提供 ROS 服务的系统主机为 <code>192.168.1.101</code>，两者含义不同。GUID、IP 和设备 ID 是本次环境的实际值，其他环境应使用各自搜索结果。</p><p class="bullet">• <code>valid=true</code> 表示驱动将该条目标记为有效设备，不证明已经建立连接、标定有效或能够采集。</p><p class="bullet">• <code>camera_discovery</code> 是文档条目标识；实际 Topic 名称始终是 <code>/at/camera_node/sensor_search_result</code>。</p>
 </article><article class="endpoint searchable" id="camera_eye_images" data-category="camera">
 <div class="endpoint-heading"><span class="method">SERVICE</span><h3>获取双目图像</h3></div>
 <p class="endpoint-name">/at/camera_node/get_eye_images</p><p class="muted">weld_interfaces/srv/ATGetEyeImages</p>
@@ -8908,11 +9765,12 @@ python3 &quot;$A/examples/python/robot.py&quot; --execute --endpoint-prefix /api
 &quot;$A/.build/cpp/aotai_cpp_robot&quot; --execute --endpoint-prefix /api_device_mock --input &quot;$A/examples/data/device-control.json&quot;</code></pre></div>
 <p><code>move_line</code> 和 <code>move_joint</code> 同时提供 Service 与 Action。此模块演示 <code>move_step</code> Service；运动 Action 另有位置反馈和 <code>waitArrival</code> 结果，当前 C++ SDK 未提供专用封装，可直接使用 <code>rclcpp_action</code> 和随附 Action 定义接入。</p>
 <h3>3D相机与点云</h3>
+<p>相机 Python 示例统一放在 <code>examples/python/camera/</code>。<a href="../examples/python/camera/README.md">68 个 config 命令目录</a> 提供每条命令的独立脚本，读取示例无需参数；设置示例采用原值写回与回读核对，电机、激光等用例需先核对现场条件。完整扫描使用 <a href="../examples/python/camera/camera_scan_demo.py">camera_scan_demo.py</a>，运行方式和结果格式见<a href="../examples/python/camera/camera_scan_demo.md">扫描说明</a>。</p>
 <p>3D 相机与线激光使用不同协议。先调用 search，从 <code>/at/camera_node/sensor_search_result</code> 的 <code>std_msgs/String.data</code> JSON 数组取得设备 GUID；连接配置文件至少包含 <code>command_type:&quot;connect&quot;</code> 和目标设备 <code>guid</code>，其他 VZ 配置字段按目标驱动填写。没有有效 GUID 时不要执行连接或采集。</p>
-<div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-bash">python3 &quot;$A/examples/python/camera_capture.py&quot;          # 离线
+<div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-bash">python3 &quot;$A/examples/python/camera/camera_capture.py&quot;          # 离线
 &quot;$A/.build/cpp/aotai_cpp_camera_capture&quot;                 # 离线
 # 显式采集：CONFIG 是目标环境的 VZ 配置文件，不是随附演示数据
-python3 &quot;$A/examples/python/camera_capture.py&quot; --execute --config CONFIG.json --seconds 1
+python3 &quot;$A/examples/python/camera/camera_capture.py&quot; --execute --config CONFIG.json --seconds 1
 &quot;$A/.build/cpp/aotai_cpp_camera_capture&quot; --execute --config CONFIG.json --seconds 1</code></pre></div>
 <p>采集程序按connect → connect_status=1 → start_capture → 指定采集间隔 → stop_capture；开始成功不等于已有可下载点云。异常后采集是否仍在运行可能未知，不自动连接或重试。APP点云文件使用<a href="#point-cloud-download">HTTP下载</a>，取得<code>world.pcd</code>后解析显示；相机采集示例不自动下载文件，也不等同于扫描业务已完成。</p>
 <h3>工艺设置与关联</h3>
@@ -10005,12 +10863,13 @@ int main(int argc, char **argv) {
 }
 </code></pre></div>
 </div></article><article class="module-example searchable" id="examples-camera"><h3>3D 相机与点云</h3>
+<p>配置接口的 68 个命令各有独立 Python 示例：<a href="../examples/python/camera/README.md">用例目录与运行说明</a>。搜索、配置、采集和点云脚本统一位于 examples/python/camera/。</p><p>完整单相机扫描流程：<a href="../examples/python/camera/camera_scan_demo.py">camera_scan_demo.py</a> · <a href="../examples/python/camera/camera_scan_demo.md">运行步骤、结果文件与已知限制</a>。2026-11-05已完成真机扫描：912214个点、823个数据块，下载点数核对一致；结束后关闭激光、禁用电机，关罩命令成功。<a href="#camera_config">实际配置</a> · <a href="#camera_control">采集控制与下载结果</a> · <a href="#camera_status">开始与结束通知</a>。</p>
 <div class="tabs module-tabs" role="tablist" aria-label="3D 相机与点云语言示例">
 <button type="button" role="tab" id="examples-camera-tab-0" aria-controls="examples-camera-panel-0" aria-selected="true">Python</button>
 <button type="button" role="tab" id="examples-camera-tab-1" aria-controls="examples-camera-panel-1" aria-selected="false">C++</button>
 </div>
 <div class="tab-panel" role="tabpanel" id="examples-camera-panel-0" aria-labelledby="examples-camera-tab-0">
-<p class="source-path">完整示例文件：<a href="../examples/python/camera_capture.py">examples/python/camera_capture.py</a></p><div class="codebox" data-source="examples/python/camera_capture.py"><button class="copy" type="button">复制</button><pre><code class="language-python">#!/usr/bin/env python3
+<p class="source-path">完整示例文件：<a href="../examples/python/camera/camera_capture.py">examples/python/camera/camera_capture.py</a></p><div class="codebox" data-source="examples/python/camera/camera_capture.py"><button class="copy" type="button">复制</button><pre><code class="language-python">#!/usr/bin/env python3
 &quot;&quot;&quot;VZ connect/config -&gt; start capture -&gt; stop capture. Download is a separate example.&quot;&quot;&quot;
 
 import argparse
@@ -11224,6 +12083,106 @@ ros2 run my_weld_client robot_status_client</code></pre></div>
 <p>在自己的业务代码中创建对应类型的 Service client、Topic subscription 或 Action client；按接口表填写请求，处理发现/响应超时，分别判断业务状态、Action 接受/结果及设备状态。不要将通信成功当成设备动作完成，也不要自动重发超时控制请求。</p>
 <h4>3. Python 程序</h4>
 <p>Python 同样直接使用 ROS 2：加载上述 ROS 与接口环境，通过 <code>rclpy</code> 创建节点，导入 <code>from weld_interfaces.srv import ATStringGeneric</code>，再调用 <code>/at/robot/status</code>。创建请求时设置 <code>id=&quot;&quot;</code>、<code>data=&quot;robot_status&quot;</code>；等待服务、发送异步请求并处理超时。响应 <code>status == 200</code> 后解析 <code>data</code> 中的 JSON，结束时销毁节点并关闭 rclpy。无需安装本交付的 Python SDK。</p>
+<h4>3.1 跨主机实例：在自己的电脑查询 3D 相机配置</h4>
+<p>下面使用随包的可选 Python SDK 和 <a href="../examples/python/camera/camera_config.py">camera_config.py</a>。Python 程序运行在用户电脑，通过原生 ROS 2/DDS 调用系统主机上的服务。所需文件均在 API 包内。</p>
+<p>相机相关 Python 示例统一位于 <code>examples/python/camera/</code>。完整的 <a href="../examples/python/camera/README.md">68 个 config 命令用例</a> 每条一个同名 <code>.py</code>，可从 <code>get_camera_config.py</code> 开始；完整采集使用 <a href="../examples/python/camera/camera_scan_demo.py">camera_scan_demo.py</a>，详见<a href="../examples/python/camera/camera_scan_demo.md">扫描运行说明</a>。</p>
+<div class="table-scroll"><table>
+<tr><td>配置项</td><td>本次实测环境</td><td>其他环境如何填写</td></tr>
+<tr><td>用户电脑通信网卡 IP</td><td>192.168.1.252</td><td>填写本机真实绑定、用于访问系统主机的 IPv4 地址</td></tr>
+<tr><td>系统主机 IP</td><td>192.168.1.101</td><td>运行 <code>/at/camera_node/config</code> 等 ROS 服务的计算机地址</td></tr>
+<tr><td>相机设备 IP</td><td>192.168.1.20</td><td>由系统主机上的驱动访问；不要把它填成 DDS 发现目标</td></tr>
+<tr><td>ROS_DOMAIN_ID</td><td>0</td><td>与服务端一致，0 只是本环境的值</td></tr>
+</table></div>
+<p><strong>先确认网络出口。</strong> 在用户电脑执行：</p>
+<div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-bash">ip -brief -4 address
+ip route get 192.168.1.101
+ping -c 2 192.168.1.101</code></pre></div>
+<p>本环境的正确路由包含 <code>dev ens38 src 192.168.1.252</code>。网卡名称不固定，以本机实际输出为准。多网卡、VPN 或代理环境要检查是否走了错误网卡或旧静态路由。虚拟机需要配置能双向访问设备网络的连接；本环境使用桥接网卡。ping 成功只证明 ICMP 可达，DDS 的发现和数据通信也必须双向可达。</p>
+<p><strong>配置 DDS 使用的网卡和发现目标。</strong> 随包提供 <a href="../examples/config/fastdds_client.xml">examples/config/fastdds_client.xml</a>，适用于这里使用的 ROS 2 Humble / Fast DDS：</p>
+<p class="bullet">• <code>interfaceWhiteList/address</code>：改为用户电脑的通信网卡 IP，本例为 <code>192.168.1.252</code>。</p>
+<p class="bullet">• <code>initialPeersList/locator/udpv4/address</code>：改为系统主机 IP，本例为 <code>192.168.1.101</code>。</p>
+<p>这个文件只配置客户端 DDS，不修改网卡地址或系统路由。它通过 UDP 使用指定网卡，并向系统主机发起发现；系统主机还必须能够向客户端通信。初始发现目标不是服务的独占绑定地址，同一 ROS domain 中应避免多个系统提供相同服务名。这里的 initial peer 也不是 Discovery Server，无需在 101 上另外启动发现服务器。</p>
+<p><strong>首次使用先按上文构建接口包；以后每个新终端执行下面的命令。</strong> 先进入解压后的 API 根目录（包含 <code>sdk</code>、<code>interfaces</code>、<code>examples</code>），再执行：</p>
+<div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-bash">source /opt/ros/humble/setup.bash
+source install/setup.bash
+export PYTHONPATH=&quot;$PWD/sdk/python:${PYTHONPATH:-}&quot;
+
+export ROS_DOMAIN_ID=0
+export ROS_LOCALHOST_ONLY=0
+export RMW_IMPLEMENTATION=rmw_fastrtps_cpp
+unset ROS_DISCOVERY_SERVER FASTDDS_DEFAULT_PROFILES_FILE
+export FASTRTPS_DEFAULT_PROFILES_FILE=&quot;$PWD/examples/config/fastdds_client.xml&quot;
+
+python3 examples/python/camera/camera_config.py</code></pre></div>
+<p>若接口包已在其他工作区安装，将 <code>source install/setup.bash</code> 替换为该接口包实际的环境脚本路径。这里通过 <code>PYTHONPATH</code> 加载随包 SDK，不需要额外安装它。以上变量只影响当前终端及其启动的程序；修改 XML 或通信地址后，要重新启动 Python 客户端。</p>
+<p><code>camera_config.py</code> 会自动加载随包 <code>examples/config/fastdds_client.xml</code>，并设置 domain 0、Fast DDS 和跨主机通信；当前文件已经填写系统主机 <code>192.168.1.101</code>、本机网卡 <code>192.168.1.252</code>。在此环境中，加载 ROS、接口包和 <code>PYTHONPATH</code> 后即可直接运行，DDS 环境变量由脚本设置。换环境时修改 XML 中的 IP；domain 不为 0 时还需修改脚本中的 <code>ROS_DOMAIN_ID</code>。上面的完整环境命令仍适用于其他 Python/C++ 客户端。</p>
+<p>示例固定发送 <code>{&quot;command_type&quot;:&quot;get_camera_config&quot;}</code>，不需要命令行参数。查询部分的核心代码如下：</p>
+<div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-python">import json
+from aotai_sdk import Client
+
+with Client() as client:
+    request = {&quot;command_type&quot;: &quot;get_camera_config&quot;}
+    response = client.camera_config(json.dumps(request), timeout=15)
+    print(json.dumps(json.loads(response.message), ensure_ascii=False, indent=2))</code></pre></div>
+<p><code>Client</code> 查找的是服务名 <code>/at/camera_node/config</code>。IP 位于 DDS 配置文件里，因此 Python 业务代码无需填写系统主机 IP。</p>
+<h5>在同一个 Python 程序中复用通信配置</h5>
+<p>保留随包 <a href="../examples/python/camera/camera_config.py">camera_config.py</a> 作为完整示例。文件开头的环境配置必须在第一次创建 <code>Client()</code> 或初始化 <code>rclpy</code> 之前执行：</p>
+<div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-python">import os
+from pathlib import Path
+
+os.environ.update(
+    ROS_DOMAIN_ID=&quot;0&quot;,
+    ROS_LOCALHOST_ONLY=&quot;0&quot;,
+    RMW_IMPLEMENTATION=&quot;rmw_fastrtps_cpp&quot;,
+    FASTRTPS_DEFAULT_PROFILES_FILE=str(
+        Path(__file__).resolve().parents[2] / &quot;config/fastdds_client.xml&quot;
+    ),
+)
+os.environ.pop(&quot;ROS_DISCOVERY_SERVER&quot;, None)
+os.environ.pop(&quot;FASTDDS_DEFAULT_PROFILES_FILE&quot;, None)</code></pre></div>
+<div class="table-scroll"><table>
+<tr><td>配置</td><td>作用</td></tr>
+<tr><td><code>ROS_DOMAIN_ID=&quot;0&quot;</code></td><td>使用 domain 0，需与服务端一致</td></tr>
+<tr><td><code>ROS_LOCALHOST_ONLY=&quot;0&quot;</code></td><td>允许跨主机 ROS 通信</td></tr>
+<tr><td><code>RMW_IMPLEMENTATION=&quot;rmw_fastrtps_cpp&quot;</code></td><td>选择本示例使用的 Fast DDS 中间件</td></tr>
+<tr><td><code>FASTRTPS_DEFAULT_PROFILES_FILE</code></td><td>指定包内 XML，其中配置本机网卡 IP 和系统主机初始发现地址</td></tr>
+<tr><td>移除 <code>ROS_DISCOVERY_SERVER</code></td><td>清除继承的 Discovery Server 配置，使用本示例的发现方式</td></tr>
+<tr><td>移除 <code>FASTDDS_DEFAULT_PROFILES_FILE</code></td><td>避免另一配置文件变量与本示例的配置混用</td></tr>
+</table></div>
+<p>上述相对路径按脚本位于 <code>examples/python/camera/</code> 编写。移动脚本后需要调整 XML 路径；这段代码不会替用户安装或加载 ROS、<code>weld_interfaces</code> 和 Python SDK。</p>
+<p>配置完成后，同一 Python 进程中的后续 <code>Client()</code> 都使用这套通信环境，可以调用相机、机器人、焊机等服务，不需要在每次请求前重复设置。例如在同一个客户端中连续查询：</p>
+<div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-python"># 放在上面的环境配置之后；相机须已连接。
+from aotai_sdk import Client
+
+with Client() as client:
+    print(client.camera_config(&#x27;{&quot;command_type&quot;:&quot;get_camera_config&quot;}&#x27;, timeout=15).message)
+    print(client.camera_config(&#x27;{&quot;command_type&quot;:&quot;get_laser_config&quot;}&#x27;, timeout=15).message)</code></pre></div>
+<p>通信配置不代替设备连接、使能或任务前置条件。某个服务可调用，不代表所有设备都已就绪。SDK 的同步接口应在创建 <code>Client</code> 的线程中调用，不要在订阅回调里直接执行这些同步请求。</p>
+<p><code>os.environ</code> 只修改当前 Python 进程的环境，通常也会被它之后启动的子进程继承；不会修改父终端、其他已运行程序或系统配置。退出后从终端另行启动一个 <code>.py</code>，仍需在那个脚本开头设置，或先在终端统一 <code>export</code>。本示例把配置放在 <code>if __name__ == &quot;__main__&quot;</code> 中，因此仅 <code>import camera_config</code> 不会自动配置环境或发起查询。修改 DDS 配置后应重新启动客户端，不能认为给已经创建的 <code>Client</code> 修改环境变量会立即切换目标。</p>
+<p><strong>查询前相机必须已经连接。</strong> <code>camera_config.py</code> 只读取参数，不会自动连接。若收到 <code>Device not connected</code>，可先运行随包搜索示例：</p>
+<div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-bash">python3 examples/python/camera/camera_search.py --search --seconds 30</code></pre></div>
+<p>然后将实际搜索结果中的 GUID 填入下面的单次连接请求；本例 GUID 属于上述实测设备：</p>
+<div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-python">import json
+from aotai_sdk import Client
+
+with Client() as client:
+    request = {
+        &quot;command_type&quot;: &quot;connect&quot;,
+        &quot;guid&quot;: &quot;a397a255-53be-41fc-996b-521413e9e22d&quot;,
+    }
+    print(client.camera_config(json.dumps(request), timeout=15).message)
+    print(client.camera_config(&#x27;{&quot;command_type&quot;:&quot;connect_status&quot;}&#x27;, timeout=15).message)</code></pre></div>
+<p>连接请求会改变设备连接状态；确认 <code>connect_status=1</code> 后再查询配置。连接请求超时时，结果可能未知，应单独查询 <code>connect_status</code>，不要直接重发连接。</p>
+<p>2026-11-02 在上述网络环境已读到 <code>status=200</code>、<code>message=&quot;Camera configuration retrieved&quot;</code>，<code>camera_config</code> 中包含曝光 <code>260</code>、模式 <code>fixed</code>、帧率 <code>203</code>、左右增益和 ROI。这些是本次实际读值，不是其他设备的默认值或推荐写入参数。</p>
+<div class="table-scroll"><table>
+<tr><td>现象</td><td>检查方法</td></tr>
+<tr><td>找不到 <code>aotai_sdk</code></td><td>确认位于 API 根目录并设置了上述 <code>PYTHONPATH</code></td></tr>
+<tr><td>找不到 <code>weld_interfaces</code></td><td>确认已构建匹配接口包，并加载了它的环境脚本</td></tr>
+<tr><td><code>service unavailable</code></td><td>检查服务端节点、domain、XML 中两处 IP、本机路由及双向 DDS 通信</td></tr>
+<tr><td>ROS CLI 与 Python 发现结果不一致</td><td>确认两者终端环境相同；旧 <code>ros2 daemon</code> 可能沿用原环境，可停止 daemon 后重新检查</td></tr>
+<tr><td><code>Device not connected</code></td><td>ROS 服务已有业务响应，但相机设备尚未连接</td></tr>
+<tr><td>调用超时或没有输出</td><td>区分节点创建、服务发现和响应等待；服务 timeout 不覆盖整个节点初始化过程，不把超时当作设备执行失败或成功</td></tr>
+</table></div>
 <h4>4. 只运行随包最小 C++ Demo</h4>
 <p>如果暂时不创建自己的包，可直接构建已经随附的原生程序：</p>
 <div class="codebox"><button class="copy" type="button">复制</button><pre><code class="language-bash">cd &quot;$API_DIR&quot;

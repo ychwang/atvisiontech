@@ -9,7 +9,7 @@ Ubuntu 虚拟机运行。IP 不作为 Client 参数，DDS 网络、ROS_DOMAIN_ID
 ## 1. 当前机器运行
 
 ```bash
-cd /path/to/ros_workspace
+cd /home/rosadmin/whc/develop_test
 source verification/python-sdk-manual/setup_local_sdk.bash
 python3 atweldsystemapi/examples/python/auto_task.py status
 ```
@@ -61,7 +61,7 @@ python3 atweldsystemapi/examples/python/auto_task.py submit \
 在另一个已 source 同样环境的终端操作；仅在反馈 `101007` 且工程 UID 匹配时启动：
 
 ```bash
-cd /path/to/ros_workspace
+cd /home/rosadmin/whc/develop_test
 source verification/python-sdk-manual/setup_local_sdk.bash
 python3 atweldsystemapi/examples/python/auto_task.py start \
   --expected-uid YOUR_UID --confirm-site-safe

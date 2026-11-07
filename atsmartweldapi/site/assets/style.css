@@ -17,6 +17,10 @@
 .field-table tbody tr:hover { background: #f0f6f1; }
 .field-path { overflow-wrap: normal; word-break: normal; padding: 0; background: transparent; color: #20584c; }
 .field-table td strong { font-weight: 600; }
+#camera_config td { overflow-wrap: anywhere; }
+.verified-exchanges { border-top: 1px solid var(--line); margin-top: 26px; padding-top: 8px; }
+.verified-exchanges > details { border: 1px solid var(--line); border-radius: 6px; padding: 14px 16px; margin: 12px 0; }
+.verified-exchanges > details > summary { line-height: 1.7; }
 @media (max-width: 720px) {
   .endpoint-summary { font-size: 15px; }
   .field-table { min-width: 740px; font-size: 13px; }

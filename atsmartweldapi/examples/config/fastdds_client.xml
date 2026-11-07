@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!-- ROS 2 Humble / rmw_fastrtps_cpp 客户端示例；请替换下面两个 IP。 -->
+<profiles xmlns="http://www.eprosima.com/XMLSchemas/fastRTPS_Profiles">
+  <transport_descriptors>
+    <transport_descriptor>
+      <transport_id>device_lan_udp</transport_id>
+      <type>UDPv4</type>
+      <maxInitialPeersRange>64</maxInitialPeersRange>
+      <interfaceWhiteList>
+        <!-- 本机与系统主机通信的网卡 IPv4 地址。 -->
+        <address>192.168.1.252</address>
+      </interfaceWhiteList>
+    </transport_descriptor>
+  </transport_descriptors>
+  <participant profile_name="device_lan_client" is_default_profile="true">
+    <rtps>
+      <userTransports>
+        <transport_id>device_lan_udp</transport_id>
+      </userTransports>
+      <useBuiltinTransports>false</useBuiltinTransports>
+      <builtin>
+        <initialPeersList>
+          <locator>
+            <udpv4>
+              <!-- 运行相机、机器人等 ROS 服务的系统主机 IPv4 地址。 -->
+              <address>192.168.1.101</address>
+            </udpv4>
+          </locator>
+        </initialPeersList>
+      </builtin>
+    </rtps>
+  </participant>
+</profiles>

@@ -1,0 +1,752 @@
+[
+  {
+    "command": "connect",
+    "file": "connect.py",
+    "title": "连接已发现的相机",
+    "risk": "write",
+    "request_keys": [
+      "guid"
+    ],
+    "guarded": false,
+    "notes": [
+      "已连接时不会因新GUID自动切换相机；connect内读取配置SDK错误处理不完整"
+    ]
+  },
+  {
+    "command": "disconnect",
+    "file": "disconnect.py",
+    "title": "断开当前相机",
+    "risk": "write",
+    "request_keys": [],
+    "guarded": true,
+    "notes": [
+      "关闭当前设备句柄；放在全部测试末尾，或记录原状态后重新连接"
+    ]
+  },
+  {
+    "command": "connect_status",
+    "file": "connect_status.py",
+    "title": "读取连接状态",
+    "risk": "read",
+    "request_keys": [],
+    "guarded": false,
+    "notes": [
+      "未连接时先被全局门禁返回500，正常不会返回200+0"
+    ]
+  },
+  {
+    "command": "camera_configuration",
+    "file": "camera_configuration.py",
+    "title": "写入相机曝光、帧率、增益和ROI",
+    "risk": "write",
+    "request_keys": [
+      "camera_config"
+    ],
+    "guarded": false,
+    "notes": [
+      "exposure写入强制fixed；若原模式auto则不能直接原值写回exposure",
+      "ROI失败status可能覆盖为200；检查error_type并回读",
+      "部分setter忽略SDK返回码",
+      "示例修改frame_rate相邻值，回读后finally恢复原值并核对完整配置"
+    ]
+  },
+  {
+    "command": "laser_configuration",
+    "file": "laser_configuration.py",
+    "title": "写入激光开关和功率",
+    "risk": "laser",
+    "request_keys": [
+      "laser_config"
+    ],
+    "guarded": true,
+    "notes": [
+      "功率范围由get_laser_config返回laser_power_range",
+      "激光失败status可能是原始SDK值"
+    ]
+  },
+  {
+    "command": "get_param_range",
+    "file": "get_param_range.py",
+    "title": "读取设备参数范围",
+    "risk": "read",
+    "request_keys": [],
+    "guarded": false,
+    "notes": [
+      "QueryParamRange返回码未检查；不能仅凭200认为每项范围可信"
+    ]
+  },
+  {
+    "command": "get_camera_config",
+    "file": "get_camera_config.py",
+    "title": "读取相机配置",
+    "risk": "read",
+    "request_keys": [],
+    "guarded": false,
+    "notes": [
+      "部分底层读取错误未传递，数值需合理性验证"
+    ]
+  },
+  {
+    "command": "get_resolution",
+    "file": "get_resolution.py",
+    "title": "读取相机分辨率",
+    "risk": "read",
+    "request_keys": [],
+    "guarded": false,
+    "notes": []
+  },
+  {
+    "command": "get_laser_config",
+    "file": "get_laser_config.py",
+    "title": "读取激光配置",
+    "risk": "read",
+    "request_keys": [],
+    "guarded": false,
+    "notes": [
+      "底层查询失败只打印日志，status仍可能200"
+    ]
+  },
+  {
+    "command": "laser_status",
+    "file": "laser_status.py",
+    "title": "读取激光使能状态",
+    "risk": "read",
+    "request_keys": [],
+    "guarded": false,
+    "notes": [
+      "这是IsEnableLaserLight，与laser_off含义不完全相同"
+    ]
+  },
+  {
+    "command": "set_eye_hand_calib_cfg",
+    "file": "set_eye_hand_calib_cfg.py",
+    "title": "写入手眼标定配置",
+    "risk": "calibration",
+    "request_keys": [
+      "calib_cfg_para"
+    ],
+    "guarded": true,
+    "notes": [
+      "11键全部必填；应从get_eye_hand_calib_cfg取得真实参数原值写回",
+      "首次会初始化标定算法库；SetEyeHandCalibCfgPara返回码未检查"
+    ]
+  },
+  {
+    "command": "get_eye_hand_calib_cfg",
+    "file": "get_eye_hand_calib_cfg.py",
+    "title": "读取手眼标定配置",
+    "risk": "calibration",
+    "request_keys": [],
+    "guarded": false,
+    "notes": [
+      "首次会初始化算法库；GetEyeHandCalibCfgPara返回码未检查"
+    ]
+  },
+  {
+    "command": "get_calib_board_extrinsic",
+    "file": "get_calib_board_extrinsic.py",
+    "title": "采图并检测标定板外参",
+    "risk": "calibration",
+    "request_keys": [],
+    "guarded": true,
+    "notes": [
+      "实际自动获取相机图像并执行标定板检测，不是纯查询",
+      "需要真实标定板和匹配的标定配置；不会移动机器人"
+    ]
+  },
+  {
+    "command": "get_detected_calib_board_info",
+    "file": "get_detected_calib_board_info.py",
+    "title": "读取上一次标定板检测结果",
+    "risk": "calibration",
+    "request_keys": [],
+    "guarded": true,
+    "notes": [
+      "读取上一轮标定板检测缓存；可能无数据返回500",
+      "有图像时会在服务端/tmp写PNG，路径不是客户端路径"
+    ]
+  },
+  {
+    "command": "get_eye_hand_calib_matrix",
+    "file": "get_eye_hand_calib_matrix.py",
+    "title": "根据真实样本计算手眼标定矩阵",
+    "risk": "calibration",
+    "request_keys": [
+      "nPointNum",
+      "pExtrinsicList",
+      "pRobotPointList"
+    ],
+    "guarded": false,
+    "notes": [
+      "必须来自真实成对样本，坐标顺序/单位与配置一致；不造零样本",
+      "算法计算，不是无参数读取；缺真实样本应明确SKIP"
+    ],
+    "optional_request_keys": [
+      "pCalibRefPointList"
+    ]
+  },
+  {
+    "command": "enable_swing_motor",
+    "file": "enable_swing_motor.py",
+    "title": "启用摆动电机",
+    "risk": "motion",
+    "request_keys": [],
+    "guarded": true,
+    "notes": []
+  },
+  {
+    "command": "disable_swing_motor",
+    "file": "disable_swing_motor.py",
+    "title": "禁用摆动电机",
+    "risk": "motion",
+    "request_keys": [],
+    "guarded": true,
+    "notes": []
+  },
+  {
+    "command": "reboot_swing",
+    "file": "reboot_swing.py",
+    "title": "重启摆动模块",
+    "risk": "motion",
+    "request_keys": [],
+    "guarded": true,
+    "notes": [
+      "重启后恢复时间及参数保持行为未由接口保证；不要自动重试"
+    ]
+  },
+  {
+    "command": "is_enable_swing_motor",
+    "file": "is_enable_swing_motor.py",
+    "title": "读取摆动电机使能状态",
+    "risk": "read",
+    "request_keys": [],
+    "guarded": false,
+    "notes": [
+      "忽略SDK错误码"
+    ]
+  },
+  {
+    "command": "set_swing_angle_speed",
+    "file": "set_swing_angle_speed.py",
+    "title": "写入摆动角速度",
+    "risk": "motion",
+    "request_keys": [
+      "angle_speed"
+    ],
+    "guarded": true,
+    "notes": []
+  },
+  {
+    "command": "get_swing_angle_speed",
+    "file": "get_swing_angle_speed.py",
+    "title": "读取摆动角速度",
+    "risk": "read",
+    "request_keys": [],
+    "guarded": false,
+    "notes": []
+  },
+  {
+    "command": "set_swing_motor_angle",
+    "file": "set_swing_motor_angle.py",
+    "title": "写入摆动起止位置",
+    "risk": "motion",
+    "request_keys": [
+      "start_pos",
+      "end_pos"
+    ],
+    "guarded": true,
+    "notes": [
+      "危险：缺参数后设置403但仍继续调用SDK；必须本地检查所有必填参数"
+    ]
+  },
+  {
+    "command": "get_swing_motor_angle",
+    "file": "get_swing_motor_angle.py",
+    "title": "读取摆动起止位置",
+    "risk": "read",
+    "request_keys": [],
+    "guarded": false,
+    "notes": []
+  },
+  {
+    "command": "rotate_swing",
+    "file": "rotate_swing.py",
+    "title": "旋转到指定角度",
+    "risk": "motion",
+    "request_keys": [
+      "angle"
+    ],
+    "guarded": true,
+    "notes": [
+      "危险：缺参数后设置403但仍继续调用SDK；必须本地检查所有必填参数"
+    ]
+  },
+  {
+    "command": "rotate_swing_to_start",
+    "file": "rotate_swing_to_start.py",
+    "title": "旋转到开始位置",
+    "risk": "motion",
+    "request_keys": [],
+    "guarded": true,
+    "notes": []
+  },
+  {
+    "command": "set_swing_cur_start_pos",
+    "file": "set_swing_cur_start_pos.py",
+    "title": "将当前位置设为开始位置",
+    "risk": "motion",
+    "request_keys": [],
+    "guarded": true,
+    "notes": []
+  },
+  {
+    "command": "set_swing_cur_end_pos",
+    "file": "set_swing_cur_end_pos.py",
+    "title": "将当前位置设为结束位置",
+    "risk": "motion",
+    "request_keys": [],
+    "guarded": true,
+    "notes": []
+  },
+  {
+    "command": "set_swing_scan_mode",
+    "file": "set_swing_scan_mode.py",
+    "title": "写入摆动扫描模式",
+    "risk": "motion",
+    "request_keys": [
+      "scan_mode"
+    ],
+    "guarded": true,
+    "notes": [
+      "危险：缺参数后设置403但仍继续调用SDK；必须本地检查所有必填参数"
+    ]
+  },
+  {
+    "command": "get_swing_scan_mode",
+    "file": "get_swing_scan_mode.py",
+    "title": "读取摆动扫描模式",
+    "risk": "read",
+    "request_keys": [],
+    "guarded": false,
+    "notes": []
+  },
+  {
+    "command": "get_swing_motor_info",
+    "file": "get_swing_motor_info.py",
+    "title": "读取摆动模块信息",
+    "risk": "read",
+    "request_keys": [],
+    "guarded": false,
+    "notes": []
+  },
+  {
+    "command": "get_swing_cur_angle",
+    "file": "get_swing_cur_angle.py",
+    "title": "读取当前摆动角度",
+    "risk": "read",
+    "request_keys": [],
+    "guarded": false,
+    "notes": [
+      "忽略SDK错误码；200不保证值有效"
+    ]
+  },
+  {
+    "command": "set_swing_stop_time",
+    "file": "set_swing_stop_time.py",
+    "title": "写入摆动停顿时间",
+    "risk": "motion",
+    "request_keys": [
+      "mseconds"
+    ],
+    "guarded": true,
+    "notes": [
+      "API无getter，不能自动取得原值或还原；需现场给定真实测试值",
+      "危险：缺参数后设置403但仍继续调用SDK；必须本地检查所有必填参数"
+    ]
+  },
+  {
+    "command": "set_swing_rotate_direct",
+    "file": "set_swing_rotate_direct.py",
+    "title": "写入摆动方向",
+    "risk": "motion",
+    "request_keys": [
+      "rotate_direct"
+    ],
+    "guarded": true,
+    "notes": [
+      "危险：缺参数后设置403但仍继续调用SDK；必须本地检查所有必填参数"
+    ]
+  },
+  {
+    "command": "get_swing_rotate_direct",
+    "file": "get_swing_rotate_direct.py",
+    "title": "读取摆动方向",
+    "risk": "read",
+    "request_keys": [],
+    "guarded": false,
+    "notes": []
+  },
+  {
+    "command": "set_swing_stop_angle",
+    "file": "set_swing_stop_angle.py",
+    "title": "写入激光器停止位置",
+    "risk": "motion",
+    "request_keys": [
+      "angle"
+    ],
+    "guarded": true,
+    "notes": [
+      "危险：缺参数后设置403但仍继续调用SDK；必须本地检查所有必填参数"
+    ]
+  },
+  {
+    "command": "get_swing_stop_angle",
+    "file": "get_swing_stop_angle.py",
+    "title": "读取激光器停止位置",
+    "risk": "read",
+    "request_keys": [],
+    "guarded": false,
+    "notes": [
+      "忽略SDK错误码；200不保证值有效"
+    ]
+  },
+  {
+    "command": "set_swing_end_angle_thres",
+    "file": "set_swing_end_angle_thres.py",
+    "title": "写入扫描完成角度阈值",
+    "risk": "motion",
+    "request_keys": [
+      "angle"
+    ],
+    "guarded": true,
+    "notes": [
+      "getter返回float但setter使用toInt；回读值有小数则必须跳过，不能int截断",
+      "危险：缺参数后设置403但仍继续调用SDK；必须本地检查所有必填参数"
+    ]
+  },
+  {
+    "command": "get_swing_end_angle_thres",
+    "file": "get_swing_end_angle_thres.py",
+    "title": "读取扫描完成角度阈值",
+    "risk": "read",
+    "request_keys": [],
+    "guarded": false,
+    "notes": [
+      "忽略SDK错误码；200不保证值有效"
+    ]
+  },
+  {
+    "command": "set_swing_motor_work_range",
+    "file": "set_swing_motor_work_range.py",
+    "title": "写入摆动工作距离范围",
+    "risk": "motion",
+    "request_keys": [
+      "near_distance",
+      "far_distance"
+    ],
+    "guarded": true,
+    "notes": [
+      "SDK有getter但本API未暴露，不能自动取得原值或还原；必须现场给定",
+      "危险：缺参数后设置403但仍继续调用SDK；必须本地检查所有必填参数"
+    ]
+  },
+  {
+    "command": "enable_global_denoise",
+    "file": "enable_global_denoise.py",
+    "title": "开启全局降噪",
+    "risk": "write",
+    "request_keys": [],
+    "guarded": false,
+    "notes": [
+      "必须同时判断status==200且data==0；失败也可能status200"
+    ]
+  },
+  {
+    "command": "disable_global_denoise",
+    "file": "disable_global_denoise.py",
+    "title": "关闭全局降噪",
+    "risk": "write",
+    "request_keys": [],
+    "guarded": false,
+    "notes": [
+      "必须同时判断status==200且data==0；失败也可能status200"
+    ]
+  },
+  {
+    "command": "is_enable_global_denoise",
+    "file": "is_enable_global_denoise.py",
+    "title": "读取全局降噪状态",
+    "risk": "read",
+    "request_keys": [],
+    "guarded": false,
+    "notes": []
+  },
+  {
+    "command": "is_support_rgb",
+    "file": "is_support_rgb.py",
+    "title": "查询是否支持RGB相机",
+    "risk": "read",
+    "request_keys": [],
+    "guarded": false,
+    "notes": [
+      "false表示设备不具备RGB能力，后续RGB项标记不支持，不能算通过"
+    ]
+  },
+  {
+    "command": "enable_rgb",
+    "file": "enable_rgb.py",
+    "title": "写入RGB使能状态",
+    "risk": "write",
+    "request_keys": [
+      "enable"
+    ],
+    "guarded": false,
+    "notes": []
+  },
+  {
+    "command": "is_enable_rgb",
+    "file": "is_enable_rgb.py",
+    "title": "读取RGB使能状态",
+    "risk": "read",
+    "request_keys": [],
+    "guarded": false,
+    "notes": []
+  },
+  {
+    "command": "enable_rgb_awb",
+    "file": "enable_rgb_awb.py",
+    "title": "写入RGB自动白平衡开关",
+    "risk": "write",
+    "request_keys": [
+      "enable"
+    ],
+    "guarded": false,
+    "notes": []
+  },
+  {
+    "command": "is_enable_rgb_awb",
+    "file": "is_enable_rgb_awb.py",
+    "title": "读取RGB自动白平衡状态",
+    "risk": "read",
+    "request_keys": [],
+    "guarded": false,
+    "notes": []
+  },
+  {
+    "command": "enable_rgb_auto_expose",
+    "file": "enable_rgb_auto_expose.py",
+    "title": "写入RGB自动曝光开关",
+    "risk": "write",
+    "request_keys": [
+      "enable"
+    ],
+    "guarded": false,
+    "notes": []
+  },
+  {
+    "command": "is_enable_rgb_auto_expose",
+    "file": "is_enable_rgb_auto_expose.py",
+    "title": "读取RGB自动曝光状态",
+    "risk": "read",
+    "request_keys": [],
+    "guarded": false,
+    "notes": []
+  },
+  {
+    "command": "enable_strobe",
+    "file": "enable_strobe.py",
+    "title": "写入频闪开关",
+    "risk": "laser",
+    "request_keys": [
+      "enable"
+    ],
+    "guarded": true,
+    "notes": []
+  },
+  {
+    "command": "is_enable_strobe",
+    "file": "is_enable_strobe.py",
+    "title": "读取频闪状态",
+    "risk": "read",
+    "request_keys": [],
+    "guarded": false,
+    "notes": []
+  },
+  {
+    "command": "turn_on_strobe_laser",
+    "file": "turn_on_strobe_laser.py",
+    "title": "写入频闪激光开关",
+    "risk": "laser",
+    "request_keys": [
+      "on"
+    ],
+    "guarded": true,
+    "notes": []
+  },
+  {
+    "command": "is_turn_on_strobe_laser",
+    "file": "is_turn_on_strobe_laser.py",
+    "title": "读取频闪激光状态",
+    "risk": "read",
+    "request_keys": [],
+    "guarded": false,
+    "notes": []
+  },
+  {
+    "command": "enable_auto_cover_control",
+    "file": "enable_auto_cover_control.py",
+    "title": "写入保护盖自动控制开关",
+    "risk": "motion",
+    "request_keys": [
+      "enable"
+    ],
+    "guarded": true,
+    "notes": []
+  },
+  {
+    "command": "is_enable_auto_cover_control",
+    "file": "is_enable_auto_cover_control.py",
+    "title": "读取保护盖自动控制状态",
+    "risk": "read",
+    "request_keys": [],
+    "guarded": false,
+    "notes": []
+  },
+  {
+    "command": "enable_io_control",
+    "file": "enable_io_control.py",
+    "title": "写入外部IO控制开关",
+    "risk": "write",
+    "request_keys": [
+      "enable"
+    ],
+    "guarded": true,
+    "notes": [
+      "可能影响外部IO触发/控制；测试原值回写也要确认外部设备状态"
+    ]
+  },
+  {
+    "command": "is_enable_io_control",
+    "file": "is_enable_io_control.py",
+    "title": "读取外部IO控制状态",
+    "risk": "read",
+    "request_keys": [],
+    "guarded": false,
+    "notes": []
+  },
+  {
+    "command": "set_rgb_expose",
+    "file": "set_rgb_expose.py",
+    "title": "写入RGB曝光值",
+    "risk": "write",
+    "request_keys": [
+      "rgb_expose"
+    ],
+    "guarded": false,
+    "notes": []
+  },
+  {
+    "command": "get_rgb_expose",
+    "file": "get_rgb_expose.py",
+    "title": "读取RGB曝光值",
+    "risk": "read",
+    "request_keys": [],
+    "guarded": false,
+    "notes": []
+  },
+  {
+    "command": "set_rgb_gain",
+    "file": "set_rgb_gain.py",
+    "title": "写入RGB增益",
+    "risk": "write",
+    "request_keys": [
+      "rgb_gain"
+    ],
+    "guarded": false,
+    "notes": []
+  },
+  {
+    "command": "get_rgb_gain",
+    "file": "get_rgb_gain.py",
+    "title": "读取RGB增益",
+    "risk": "read",
+    "request_keys": [],
+    "guarded": false,
+    "notes": []
+  },
+  {
+    "command": "set_rgb_trigger_mode",
+    "file": "set_rgb_trigger_mode.py",
+    "title": "写入RGB触发模式",
+    "risk": "write",
+    "request_keys": [
+      "rgb_trigger_mode"
+    ],
+    "guarded": false,
+    "notes": [
+      "先启用RGB，设置不同模式并回读，finally恢复原模式及原RGB使能状态"
+    ]
+  },
+  {
+    "command": "get_rgb_trigger_mode",
+    "file": "get_rgb_trigger_mode.py",
+    "title": "读取RGB触发模式",
+    "risk": "read",
+    "request_keys": [],
+    "guarded": false,
+    "notes": []
+  },
+  {
+    "command": "set_rgb_auto_expose_thres",
+    "file": "set_rgb_auto_expose_thres.py",
+    "title": "写入RGB自动曝光阈值",
+    "risk": "write",
+    "request_keys": [
+      "rgb_auto_expose_thres"
+    ],
+    "guarded": false,
+    "notes": []
+  },
+  {
+    "command": "get_rgb_auto_expose_thres",
+    "file": "get_rgb_auto_expose_thres.py",
+    "title": "读取RGB自动曝光阈值",
+    "risk": "read",
+    "request_keys": [],
+    "guarded": false,
+    "notes": []
+  },
+  {
+    "command": "set_anti_reflect_gain_type",
+    "file": "set_anti_reflect_gain_type.py",
+    "title": "写入抗反光增益档位",
+    "risk": "write",
+    "request_keys": [
+      "anti_reflect_gain_type"
+    ],
+    "guarded": false,
+    "notes": []
+  },
+  {
+    "command": "get_anti_reflect_gain_type",
+    "file": "get_anti_reflect_gain_type.py",
+    "title": "读取抗反光增益档位",
+    "risk": "read",
+    "request_keys": [],
+    "guarded": false,
+    "notes": []
+  },
+  {
+    "command": "format_detect_roi",
+    "file": "format_detect_roi.py",
+    "title": "获取SDK格式化后的默认ROI",
+    "risk": "write",
+    "request_keys": [],
+    "guarded": true,
+    "notes": [
+      "不读取请求ROI字段，内部零初始化ROI并调用VzNL_FormatDetectROI(...,VzTrue)",
+      "未调用ConfigDetectROI，但SDK头返回说明称设置ROI，不能承诺无副作用；前后get_camera_config核对ROI",
+      "不是为用户任意输入ROI格式化的接口"
+    ]
+  }
+]

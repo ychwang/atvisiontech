@@ -39,7 +39,7 @@
 需要改成现场真实且相互匹配的 ID；不要照搬旧测试工程/工艺 ID。
 
 ```bash
-cd /path/to/ros_workspace
+cd /home/rosadmin/whc/develop_test
 source verification/python-sdk-manual/setup_local_sdk.bash
 
 # 必须填写现场确认的数字；此处故意不给可能错误的默认 ID。

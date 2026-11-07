@@ -55,13 +55,15 @@ python3 "$A/examples/python/robot.py" --execute --endpoint-prefix /api_device_mo
 
 ## 3D相机与点云
 
+相机 Python 示例统一放在 `examples/python/camera/`。[68 个 config 命令目录](../examples/python/camera/README.md) 提供每条命令的独立脚本，读取示例无需参数；设置示例采用原值写回与回读核对，电机、激光等用例需先核对现场条件。完整扫描使用 [camera_scan_demo.py](../examples/python/camera/camera_scan_demo.py)，运行方式和结果格式见[扫描说明](../examples/python/camera/camera_scan_demo.md)。
+
 3D 相机与线激光使用不同协议。先调用 search，从 `/at/camera_node/sensor_search_result` 的 `std_msgs/String.data` JSON 数组取得设备 GUID；连接配置文件至少包含 `command_type:"connect"` 和目标设备 `guid`，其他 VZ 配置字段按目标驱动填写。没有有效 GUID 时不要执行连接或采集。
 
 ```bash
-python3 "$A/examples/python/camera_capture.py"          # 离线
+python3 "$A/examples/python/camera/camera_capture.py"          # 离线
 "$A/.build/cpp/aotai_cpp_camera_capture"                 # 离线
 # 显式采集：CONFIG 是目标环境的 VZ 配置文件，不是随附演示数据
-python3 "$A/examples/python/camera_capture.py" --execute --config CONFIG.json --seconds 1
+python3 "$A/examples/python/camera/camera_capture.py" --execute --config CONFIG.json --seconds 1
 "$A/.build/cpp/aotai_cpp_camera_capture" --execute --config CONFIG.json --seconds 1
 ```
 
